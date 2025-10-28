@@ -1,10 +1,9 @@
 -- CreateTable
 CREATE TABLE `rol` (
     `idrol` INTEGER NOT NULL AUTO_INCREMENT,
-    `nombre` VARCHAR(30) NOT NULL,
+    `nombre` ENUM('administrador', 'cliente', 'tecnico') NOT NULL DEFAULT 'cliente',
     `descripcion` VARCHAR(255) NULL,
 
-    UNIQUE INDEX `rol_nombre_key`(`nombre`),
     PRIMARY KEY (`idrol`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

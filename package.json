@@ -6,7 +6,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon source/server.ts"
-    
   },
   "keywords": [],
   "author": "",
@@ -14,11 +13,12 @@
   "devDependencies": {
     "@prisma/client": "^6.18.0",
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.4",
+    "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/ms": "^2.1.0",
     "@types/multer": "^2.0.0",
+    "@types/node": "^24.9.1",
     "@types/passport": "^1.0.17",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
@@ -39,5 +39,8 @@
     "typescript": "^5.9.3",
     "winston": "^3.18.3",
     "winston-daily-rotate-file": "^5.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.28"
   }
 }

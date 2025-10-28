@@ -6,8 +6,7 @@ import path from 'path'
 import { ErrorMiddleware } from './middleware/error.middleware';
 //import { AppRoutes } from './routes/routes';
 //Recordar
-import "./config/passport"; 
-
+//import "./config/passport"; 
 
 
 const rootDir = __dirname;
