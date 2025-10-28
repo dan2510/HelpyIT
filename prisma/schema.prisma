@@ -1,0 +1,293 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+// MODELOS PRINCIPALES
+
+
+model rol {
+  idrol       Int       @id @default(autoincrement())
+  nombre      roles     @default(cliente)
+  descripcion String?   @db.VarChar(255)
+  usuario     usuario[]
+}
+
+model usuario {
+  idusuario              Int                     @id @default(autoincrement())
+  correo                 String                  @unique @db.VarChar(190)
+  contrasenahash         String                  @db.VarChar(255)
+  nombrecompleto         String                  @db.VarChar(120)
+  telefono               String?                 @db.VarChar(20)
+  idrol                  Int
+  activo                 Boolean                 @default(true)
+  ultimoiniciosesion     DateTime?
+  creadoen               DateTime                @default(now())
+  actualizadoen          DateTime                @default(now()) @updatedAt
+  eliminadoen            DateTime?
+  disponibilidad         disponibilidadtecnico?
+  cargaactual            Int?                    @default(0)
+  maxticketsimultaneos   Int?                    @default(10)
+  rol                    rol                     @relation(fields: [idrol], references: [idrol])
+  usuarioespecialidad    usuarioespecialidad[]
+  tiquetecliente         tiquete[]               @relation("clientetiquetes")
+  tiquetetecnico         tiquete[]               @relation("tecnicotiquetes")
+  historialtiquete       historialtiquete[]
+  imagentiquete          imagentiquete[]
+  asignaciontecnico      asignaciontiquete[]     @relation("tecnicoasignaciones")
+  asignacionasignador    asignaciontiquete[]     @relation("usuarioasignador")
+  notificaciondestino    notificacion[]          @relation("usuariodestino")
+  notificacionorigen     notificacion[]          @relation("usuarioorigen")
+  valoracionservicio     valoracionservicio[]
+}
+
+model especialidad {
+  idespecialidad         Int                        @id @default(autoincrement())
+  nombre                 String                     @unique @db.VarChar(80)
+  descripcion            String?                    @db.VarChar(255)
+  activo                 Boolean                    @default(true)
+  usuarioespecialidad    usuarioespecialidad[]
+  categoriaespecialidad  categoriaespecialidad[]
+}
+
+model usuarioespecialidad {
+  idusuario         Int
+  usuario           usuario           @relation(fields: [idusuario], references: [idusuario], onDelete: Cascade)
+  idespecialidad    Int
+  especialidad      especialidad      @relation(fields: [idespecialidad], references: [idespecialidad])
+  nivelexperiencia  nivelexperiencia  @default(intermedio)
+  asignadoen        DateTime          @default(now())
+
+  @@id([idusuario, idespecialidad])
+}
+
+model politicasla {
+  idsla                  Int         @id @default(autoincrement())
+  nombre                 String      @db.VarChar(100)
+  descripcion            String?     @db.VarChar(255)
+  maxminutosrespuesta    Int
+  maxminutosresolucion   Int
+  activo                 Boolean     @default(true)
+  vigentedesde           DateTime    @db.Date
+  vigentehasta           DateTime?   @db.Date
+  creadoen               DateTime    @default(now())
+  actualizadoen          DateTime    @default(now()) @updatedAt
+  categoria              categoria[]
+}
+
+model categoria {
+  idcategoria            Int                        @id @default(autoincrement())
+  nombre                 String                     @unique @db.VarChar(80)
+  descripcion            String?                    @db.VarChar(255)
+  idsla                  Int
+  activo                 Boolean                    @default(true)
+  politicasla            politicasla                @relation(fields: [idsla], references: [idsla])
+  categoriaespecialidad  categoriaespecialidad[]
+  categoriaetiqueta      categoriaetiqueta[]
+  tiquete                tiquete[]
+}
+
+model categoriaespecialidad {
+  idcategoria    Int
+  categoria      categoria    @relation(fields: [idcategoria], references: [idcategoria], onDelete: Cascade)
+  idespecialidad Int
+  especialidad   especialidad @relation(fields: [idespecialidad], references: [idespecialidad])
+
+  @@id([idcategoria, idespecialidad])
+}
+
+model etiqueta {
+  idetiqueta         Int                  @id @default(autoincrement())
+  nombre             String               @unique @db.VarChar(60)
+  descripcion        String?              @db.VarChar(255)
+  categoriaetiqueta  categoriaetiqueta[]
+}
+
+model categoriaetiqueta {
+  idcategoria Int
+  categoria   categoria @relation(fields: [idcategoria], references: [idcategoria], onDelete: Cascade)
+  idetiqueta  Int
+  etiqueta    etiqueta  @relation(fields: [idetiqueta], references: [idetiqueta], onDelete: Cascade)
+
+  @@id([idcategoria, idetiqueta])
+}
+
+model tiquete {
+  idtiquete              Int                    @id @default(autoincrement())
+  titulo                 String                 @db.VarChar(140)
+  descripcion            String                 @db.Text
+  prioridad              prioridadtiquete       @default(media)
+  estado                 estadotiquete          @default(pendiente)
+  idcategoria            Int
+  idcliente              Int
+  idtecnicoactual        Int?
+  creadoen               DateTime               @default(now())
+  primerarespuestaen     DateTime?
+  resueltoen             DateTime?
+  cerradoen              DateTime?
+  vencerespuesta         DateTime
+  venceresolucion        DateTime
+  cumplioslarespuesta    Boolean?
+  cumplioslaresolucion   Boolean?
+  categoria              categoria              @relation(fields: [idcategoria], references: [idcategoria])
+  cliente                usuario                @relation("clientetiquetes", fields: [idcliente], references: [idusuario])
+  tecnicoactual          usuario?               @relation("tecnicotiquetes", fields: [idtecnicoactual], references: [idusuario], onDelete: SetNull)
+  historialtiquete       historialtiquete[]
+  asignaciontiquete      asignaciontiquete[]
+  notificacion           notificacion[]
+  valoracionservicio     valoracionservicio[]
+}
+
+model historialtiquete {
+  idhistorial     Int             @id @default(autoincrement())
+  idtiquete       Int
+  estadoanterior  estadotiquete?
+  estadonuevo     estadotiquete
+  observacion     String?         @db.Text
+  cambiadopor     Int
+  cambiadoen      DateTime        @default(now())
+  tiquete         tiquete         @relation(fields: [idtiquete], references: [idtiquete], onDelete: Cascade)
+  usuario         usuario         @relation(fields: [cambiadopor], references: [idusuario])
+  imagentiquete   imagentiquete[]
+}
+
+model imagentiquete {
+  idimagen         Int              @id @default(autoincrement())
+  idhistorial      Int
+  rutaarchivo      String           @db.VarChar(500)
+  subidopor        Int
+  subidoen         DateTime         @default(now())
+  historialtiquete historialtiquete @relation(fields: [idhistorial], references: [idhistorial], onDelete: Cascade)
+  usuario          usuario          @relation(fields: [subidopor], references: [idusuario])
+}
+
+model reglaasignacion {
+  idregla             Int                  @id @default(autoincrement())
+  nombre              String               @db.VarChar(100)
+  descripcion         String?              @db.VarChar(255)
+  activa              Boolean              @default(true)
+  pesoprioridad       Int                  @default(1000)
+  pesoslarestante     Int                  @default(-1)
+  pesocargaactual     Int                  @default(-50)
+  pesoexperiencia     Int                  @default(100)
+  prioridadejecucion  Int                  @default(1)
+  creadoen            DateTime             @default(now())
+  actualizadoen       DateTime             @default(now()) @updatedAt
+  eliminadoen         DateTime?
+  asignaciontiquete   asignaciontiquete[]
+}
+
+model asignaciontiquete {
+  idasignacion       Int               @id @default(autoincrement())
+  idtiquete          Int
+  idtecnico          Int
+  idregla            Int?
+  metodo             metodoasignacion
+  justificacion      String?           @db.Text
+  puntajeasignacion  Int?
+  asignadopor        Int?
+  asignadoen         DateTime          @default(now())
+  tiquete            tiquete           @relation(fields: [idtiquete], references: [idtiquete], onDelete: Cascade)
+  tecnico            usuario           @relation("tecnicoasignaciones", fields: [idtecnico], references: [idusuario])
+  reglaasignacion    reglaasignacion?  @relation(fields: [idregla], references: [idregla], onDelete: SetNull)
+  usuarioasignador   usuario?          @relation("usuarioasignador", fields: [asignadopor], references: [idusuario], onDelete: SetNull)
+}
+
+model notificacion {
+  idnotificacion     Int                   @id @default(autoincrement())
+  tipo               tiponotificacion
+  idusuariodestino   Int
+  idusuarioorigen    Int?
+  idtiquete          Int?
+  titulo             String                @db.VarChar(200)
+  contenido          String?               @db.Text
+  estado             estadonotificacion    @default(pendiente)
+  creadaen           DateTime              @default(now())
+  leidaen            DateTime?
+  usuariodestino     usuario               @relation("usuariodestino", fields: [idusuariodestino], references: [idusuario], onDelete: Cascade)
+  usuarioorigen      usuario?              @relation("usuarioorigen", fields: [idusuarioorigen], references: [idusuario], onDelete: SetNull)
+  tiquete            tiquete?              @relation(fields: [idtiquete], references: [idtiquete], onDelete: Cascade)
+}
+
+model valoracionservicio {
+  idvaloracion Int      @id @default(autoincrement())
+  idtiquete    Int
+  idcliente    Int
+  calificacion Int
+  comentario   String?  @db.VarChar(500)
+  creadaen     DateTime @default(now())
+  tiquete      tiquete  @relation(fields: [idtiquete], references: [idtiquete], onDelete: Cascade)
+  cliente      usuario  @relation(fields: [idcliente], references: [idusuario], onDelete: Cascade)
+
+  @@unique([idtiquete, idcliente])
+}
+
+// ENUMS
+
+
+enum disponibilidadtecnico {
+  disponible
+  ocupado
+  ausente
+}
+
+enum nivelexperiencia {
+  basico
+  intermedio
+  avanzado
+  experto
+}
+
+enum prioridadtiquete {
+  baja
+  media
+  alta
+  critica
+}
+
+enum estadotiquete {
+  pendiente
+  asignado
+  enproceso
+  resuelto
+  cerrado
+  cancelado
+}
+
+enum metodoasignacion {
+  automatica
+  manual
+}
+
+enum tiponotificacion {
+  iniciosesion
+  asignacion
+  cambioestado
+  comentario
+  vencimientoproximo
+  ticketcreado
+  ticketcerrado
+}
+
+enum estadonotificacion {
+  pendiente
+  leida
+}
+
+enum roles {
+  administrador
+  cliente
+  tecnico
+}
