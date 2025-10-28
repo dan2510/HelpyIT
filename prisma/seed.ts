@@ -66,4 +66,3 @@ main()
     await prisma.$disconnect();
   });
 
-module.exports = { seedRoles
