@@ -1,8 +1,3 @@
-// =====================================================
-// SEED COMPLETO - SISTEMA HELPYIT
-// ARCHIVO: prisma/seed.ts
-// Todos los datos iniciales para las 16 tablas
-// =====================================================
 
 import { PrismaClient } from '@prisma/client';
 import { roles } from './seeds/roles';
@@ -26,6 +21,7 @@ const main = async () => {
     });
  ;
 
+ ;
    
     await prisma.politicasla.createMany({
       data: politicassla,
