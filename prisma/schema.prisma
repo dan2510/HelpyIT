@@ -14,81 +14,328 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//Modelos
+
+// Modelos principales
+model Rol {
+  id          Int         @id @default(autoincrement())
+  nombre      RoleNombre
+  descripcion String      @db.VarChar(255)
+  usuarios    Usuario[]
+  
+}
+
 model Usuario {
-  id       Int     @id @default(autoincrement())
-  email    String  @unique
-  nombre   String? //Puede ser nulo
-  role     Role    @default(USER)
-  password String
-  ordenes  Orden[]
+  id                     Int      @id @default(autoincrement())
+  correo                 String   @unique @db.VarChar(190)
+  contrasenahash         String   @db.VarChar(255)
+  nombrecompleto         String   @db.VarChar(120)
+  telefono               String?  @db.VarChar(20)
+  idrol                  Int
+  activo                 Boolean  @default(true) @db.TinyInt
+  ultimoiniciosesion     DateTime?
+  creadoen               DateTime @default(now())
+  actualizadoen          DateTime @default(now()) @updatedAt
+  eliminadoen            DateTime? 
+  disponibilidad         Disponibilidad @default(DISPONIBLE)
+  cargaactual            Int      @default(0)
+  maxticketsimultaneos   Int      @default(5)
+  
+  // Relaciones
+  rol                    Rol      @relation(fields: [idrol], references: [id])
+  tiquetesComoCliente    Tiquete[] @relation("ClienteTiquetes")
+  tiquetesComoTecnico    Tiquete[] @relation("TecnicoTiquetes")
+  especialidades         UsuarioEspecialidad[]
+  asignaciones           AsignacionTiquete[]
+  historialesCreados     HistorialTiquete[]
+  imagenesSubidas        ImagenTiquete[]
+  notificacionesDestino  Notificacion[] @relation("NotificacionDestino")
+  notificacionesOrigen   Notificacion[] @relation("NotificacionOrigen")
+  valoracionesCliente    ValoracionServicio[]
+  
 }
 
-model Videojuego {
-  id          Int                    @id @default(autoincrement())
-  nombre      String
-  descripcion String                 @db.VarChar(500)
-  publicar    Boolean                @default(true)
-  precio      Decimal                @db.Decimal(10, 2)
-  imagen      String                 @default("image-not-found.jpg")
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @default(now()) @updatedAt
-  generos     Genero[]
-  ordenes     OrdenVideojuego[]
-  plataformas PlataformaVideojuego[]
+model Categoria {
+  id           Int      @id @default(autoincrement())
+  nombre       String   @db.VarChar(80)
+  descripcion  String   @db.VarChar(255)
+  idsla        Int
+  activo       Boolean  @default(true) @db.TinyInt
+  
+  // Relaciones
+  politicaSla  PoliticaSla @relation(fields: [idsla], references: [id])
+  tiquetes     Tiquete[]
+  especialidades CategoriaEspecialidad[]
+  etiquetas    CategoriaEtiqueta[]
+  
+ 
 }
 
-model Genero {
-  id          Int          @id @default(autoincrement())
-  nombre      String
-  updatedAt   DateTime     @default(now()) @updatedAt
-  videojuegos Videojuego[]
+model Especialidad {
+  id          Int      @id @default(autoincrement()) 
+  nombre      String   @db.VarChar(80)
+  descripcion String   @db.VarChar(255)
+  activo      Boolean  @default(true) @db.TinyInt
+  
+  // Relaciones
+  usuarios    UsuarioEspecialidad[]
+  categorias  CategoriaEspecialidad[]
+  
+
 }
 
-model Plataforma {
-  id          Int                    @id @default(autoincrement())
-  nombre      String
-  updatedAt   DateTime               @default(now()) @updatedAt
-  videojuegos PlataformaVideojuego[]
+model Etiqueta {
+  id          Int      @id @default(autoincrement())
+  nombre      String   @db.VarChar(60)
+  descripcion String   @db.VarChar(255)
+  
+  // Relaciones
+  categorias  CategoriaEtiqueta[]
+  
+
 }
 
-model PlataformaVideojuego {
-  //Plataforma
-  plataformaId     Int
-  plataforma       Plataforma @relation(fields: [plataformaId], references: [id])
-  //Videojuego
-  videojuegoId     Int
-  videojuego       Videojuego @relation(fields: [videojuegoId], references: [id])
-  anno_lanzamiento Int
-  updatedAt        DateTime   @default(now()) @updatedAt
-
-  //Llave primaria compuesta
-  @@id([plataformaId, videojuegoId])
+model PoliticaSla {
+  id                    Int      @id @default(autoincrement())
+  nombre                String   @db.VarChar(100)
+  descripcion           String   @db.VarChar(255)
+  maxminutosrespuesta   Int      
+  maxminutosresolucion  Int      
+  activo                Boolean  @default(true) @db.TinyInt
+  vigentedesde          DateTime @db.Date
+  vigentehasta          DateTime @db.Date
+  creadoen              DateTime @default(now())
+  actualizadoen         DateTime @default(now())
+  
+  // Relaciones
+  categorias            Categoria[]
+  
 }
 
-model Orden {
-  id          Int               @id @default(autoincrement())
-  fechaOrden  DateTime          @default(now())
-  usuarioId   Int
-  usuario     Usuario           @relation(fields: [usuarioId], references: [id])
-  videojuegos OrdenVideojuego[]
+model ReglaAsignacion {
+  id                   Int      @id @default(autoincrement())
+  nombre               String   @db.VarChar(100)
+  descripcion          String   @db.VarChar(255)
+  activa               Boolean  @default(true) @db.TinyInt
+  pesoprioridad        Int     
+  pesoslarestante      Int      
+  pesocargaactual      Int      
+  pesoexperiencia      Int     
+  prioridadejecucion   Int     
+  creadoen             DateTime @default(now())
+  actualizadoen        DateTime @default(now()) @updatedAt
+  eliminadoen          DateTime?
+  
+  // Relaciones
+  asignaciones         AsignacionTiquete[]
+  
+ 
 }
 
-model OrdenVideojuego {
-  //Orden
-  ordenId      Int
-  orden        Orden      @relation(fields: [ordenId], references: [id])
-  //Videojuego
-  videojuegoId Int
-  videojuego   Videojuego @relation(fields: [videojuegoId], references: [id])
-  cantidad     Int
-  updatedAt    DateTime   @default(now()) @updatedAt
+model Tiquete {
+  id                     Int      @id @default(autoincrement())
+  titulo                 String   @db.VarChar(140)
+  descripcion            String   @db.Text
+  prioridad              Prioridad @default(MEDIA)
+  estado                 EstadoTiquete @default(ABIERTO)
+  idcategoria            Int
+  idcliente              Int
+  idtecnicoactual        Int?
+  creadoen               DateTime @default(now())
+  primerarespuestaen     DateTime? 
+  resueltoen             DateTime? 
+  cerradoen              DateTime?
+  vencerespuesta         DateTime 
+  venceresolucion        DateTime 
+  cumplioslarespuesta    Boolean? 
+  cumplioslaresolucion   Boolean?
+  
+  // Relaciones
+  categoria              Categoria @relation(fields: [idcategoria], references: [id])
+  cliente                Usuario @relation("ClienteTiquetes", fields: [idcliente], references: [id])
+  tecnicoActual          Usuario? @relation("TecnicoTiquetes", fields: [idtecnicoactual], references: [id])
+  asignaciones           AsignacionTiquete[]
+  historiales            HistorialTiquete[]
+  notificaciones         Notificacion[]
+  valoraciones           ValoracionServicio[]
+  
 
-  //Llave primaria compuesta
-  @@id([ordenId, videojuegoId])
 }
 
-enum Role {
-  USER
+model AsignacionTiquete {
+  idasignacion       Int      @id @default(autoincrement())
+  idtiquete          Int
+  idtecnico          Int
+  idregla            Int?
+  metodo             MetodoAsignacion @default(MANUAL)
+  justificacion      String?  @db.Text
+  puntajeasignacion  Int?     
+  asignadopor        Int     
+  asignadoen         DateTime @default(now())
+  
+  // Relaciones
+  tiquete            Tiquete @relation(fields: [idtiquete], references: [id])
+  tecnico            Usuario @relation(fields: [idtecnico], references: [id])
+  regla              ReglaAsignacion? @relation(fields: [idregla], references: [id])
+  
+
+}
+
+model HistorialTiquete {
+  id             Int      @id @default(autoincrement())
+  idtiquete      Int
+  estadoanterior EstadoTiquete 
+  estadonuevo    EstadoTiquete 
+  observacion    String?  @db.Text
+  cambiadopor    Int     
+  cambiadoen     DateTime @default(now())
+  
+  // Relaciones
+  tiquete        Tiquete @relation(fields: [idtiquete], references: [id])
+  usuarioCambio  Usuario @relation(fields: [cambiadopor], references: [id])
+  imagenes       ImagenTiquete[]
+  
+
+}
+
+model ImagenTiquete {
+  id           Int      @id @default(autoincrement())
+  idhistorial  Int
+  rutaarchivo  String   @db.VarChar(500)
+  subidopor    Int      
+  subidoen     DateTime @default(now())
+  
+  // Relaciones
+  historial    HistorialTiquete @relation(fields: [idhistorial], references: [id])
+  usuario      Usuario @relation(fields: [subidopor], references: [id])
+  
+
+}
+
+model Notificacion {
+  id              Int      @id @default(autoincrement()) 
+  tipo            TipoNotificacion
+  idusuariodestino Int     
+  idusuarioorigen Int?    
+  idtiquete       Int?
+  titulo          String   @db.VarChar(200)
+  contenido       String   @db.Text
+  estado          EstadoNotificacion @default(NO_LEIDA)
+  creadaen        DateTime @default(now()) 
+  leidaen         DateTime?
+  
+  // Relaciones
+  usuarioDestino  Usuario @relation("NotificacionDestino", fields: [idusuariodestino], references: [id])
+  usuarioOrigen   Usuario? @relation("NotificacionOrigen", fields: [idusuarioorigen], references: [id])
+  tiquete         Tiquete? @relation(fields: [idtiquete], references: [id])
+  
+
+}
+
+model ValoracionServicio {
+  id           Int      @id @default(autoincrement())
+  idtiquete    Int
+  idcliente    Int
+  calificacion Int
+  comentario   String?  @db.VarChar(500)
+  creadaen     DateTime @default(now())
+  
+  // Relaciones
+  tiquete      Tiquete @relation(fields: [idtiquete], references: [id])
+  cliente      Usuario @relation(fields: [idcliente], references: [id])
+  
+
+}
+
+// Tablas de relación many-to-many
+model CategoriaEspecialidad {
+  idcategoria     Int
+  idespecialidad  Int
+  
+  // Relaciones
+  categoria       Categoria @relation(fields: [idcategoria], references: [id])
+  especialidad    Especialidad @relation(fields: [idespecialidad], references: [id])
+  
+  @@id([idcategoria, idespecialidad])
+
+}
+
+model CategoriaEtiqueta {
+  idcategoria Int
+  idetiqueta  Int
+  
+  // Relaciones
+  categoria   Categoria @relation(fields: [idcategoria], references: [id])
+  etiqueta    Etiqueta @relation(fields: [idetiqueta], references: [id])
+  
+  @@id([idcategoria, idetiqueta])
+ 
+}
+
+model UsuarioEspecialidad {
+  idusuario        Int
+  idespecialidad   Int
+  nivelexperiencia NivelExperiencia 
+  asignadoen       DateTime @default(now())
+  
+  // Relaciones
+  usuario          Usuario @relation(fields: [idusuario], references: [id])
+  especialidad     Especialidad @relation(fields: [idespecialidad], references: [id])
+  
+  @@id([idusuario, idespecialidad])
+
+}
+
+// Enums
+enum RoleNombre {
   ADMIN
+  TECNICO
+  CLIENTE
+}
+
+enum Disponibilidad {
+  DISPONIBLE
+  OCUPADO
+  AUSENTE
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum EstadoTiquete {
+  ABIERTO
+  EN_PROGRESO
+  PENDIENTE
+  RESUELTO
+  CERRADO
+  CANCELADO
+  ASIGNADO
+}
+
+enum TipoNotificacion {
+  ASIGNACION
+  CAMBIO_ESTADO
+  MENSAJE
+  RECORDATORIO
+}
+
+enum EstadoNotificacion {
+  NO_LEIDA
+  LEIDA
+}
+
+enum NivelExperiencia {
+  JUNIOR
+  INTERMEDIO
+  SENIOR
+  EXPERTO
+}
+
+enum MetodoAsignacion {
+  MANUAL
+  AUTOMATICO
+  REGLA
 }
