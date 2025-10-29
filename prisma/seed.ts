@@ -1,11 +1,10 @@
 import { roles } from "./seeds/roles";
-//import { usuarios } from "./seeds/usuarios";
 import { especialidades } from "./seeds/especialidades";
 import { etiquetas } from "./seeds/etiquetas";
 import { politicasla } from "./seeds/politicasla";
 import { categorias } from "./seeds/categorias";
 import { reglasasignacion } from "./seeds/reglaasignacion";
-import { PrismaClient, Prioridad, EstadoTiquete, NivelExperiencia, MetodoAsignacion, TipoNotificacion, EstadoNotificacion } from "../generated/prisma";
+import { PrismaClient, Prioridad, EstadoTiquete, NivelExperiencia, MetodoAsignacion, TipoNotificacion, EstadoNotificacion, Disponibilidad } from "../generated/prisma";
 
 const prisma = new PrismaClient();
 
@@ -46,7 +45,7 @@ const main = async () => {
         telefono: "123-456-7890",
         rol: { connect: { id: 1 } },
         activo: true,
-        disponibilidad: "DISPONIBLE",
+        disponibilidad:  Disponibilidad.DISPONIBLE,
         cargaactual: 0,
         maxticketsimultaneos: 10,
       },
@@ -55,13 +54,13 @@ const main = async () => {
     // Usuario 2 - Supervisor (sin especialidades)
     await prisma.usuario.create({
       data: {
-        correo: "cliente@helpyit.com",
+        correo: "cliente@ibm.com",
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "María González",
         telefono: "123-456-7891",
         rol: { connect: { id: 2 } },
         activo: true,
-        disponibilidad: "DISPONIBLE",
+        disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 0,
         maxticketsimultaneos: 8,
       },
@@ -70,13 +69,13 @@ const main = async () => {
     // Usuario 3 - Carlos Rodríguez (Técnico Senior con especialidades)
     await prisma.usuario.create({
       data: {
-        correo: "tecnico1@ticketsystem.com",
+        correo: "tecnico1@helpyit.com",
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "Carlos Rodríguez",
         telefono: "123-456-7892",
         rol: { connect: { id: 3 } },
         activo: true,
-        disponibilidad: "DISPONIBLE",
+        disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 3,
         maxticketsimultaneos: 6,
         especialidades: {
@@ -101,13 +100,13 @@ const main = async () => {
     // Usuario 4 - Ana López (Técnico Junior con especialidades)
     await prisma.usuario.create({
       data: {
-        correo: "tecnico2@ticketsystem.com",
+        correo: "tecnico2@helpyit",
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "Ana López",
         telefono: "123-456-7893",
         rol: { connect: { id: 3 } },
         activo: true,
-        disponibilidad: "DISPONIBLE",
+        disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 2,
         maxticketsimultaneos: 4,
         especialidades: {
@@ -135,7 +134,7 @@ const main = async () => {
           telefono: "987-654-3210",
           idrol: 4,
           activo: true,
-          disponibilidad: "DISPONIBLE",
+          disponibilidad: Disponibilidad.DISPONIBLE,
           cargaactual: 0,
           maxticketsimultaneos: 3,
         },
@@ -146,7 +145,7 @@ const main = async () => {
           telefono: "987-654-3211",
           idrol: 4,
           activo: true,
-          disponibilidad: "DISPONIBLE",
+          disponibilidad: Disponibilidad.DISPONIBLE,
           cargaactual: 0,
           maxticketsimultaneos: 3,
         },
@@ -162,7 +161,7 @@ const main = async () => {
         telefono: "123-456-7894",
         rol: { connect: { id: 3 } },
         activo: true,
-        disponibilidad: "DISPONIBLE",
+        disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 1,
         maxticketsimultaneos: 5,
         especialidades: {
@@ -189,7 +188,7 @@ const main = async () => {
         telefono: "123-456-7895",
         rol: { connect: { id: 3 } },
         activo: true,
-        disponibilidad: "OCUPADO",
+        disponibilidad: Disponibilidad.OCUPADO,
         cargaactual: 4,
         maxticketsimultaneos: 7,
         especialidades: {
@@ -220,7 +219,7 @@ const main = async () => {
         telefono: "987-654-3212",
         rol: { connect: { id: 4 } },
         activo: true,
-        disponibilidad: "DISPONIBLE",
+        disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 0,
         maxticketsimultaneos: 3,
       },
@@ -317,6 +316,21 @@ const main = async () => {
               estadonuevo: EstadoTiquete.ABIERTO,
               observacion: "Ticket creado y asignado automáticamente",
               usuarioCambio: { connect: { id: 1 } }, // Admin
+            
+              imagenes: {
+                create: [
+                  {
+                    rutaarchivo: "evidencias/error_facturacion_pantalla1.png",
+                    usuario: { connect: { id: 5 } }, // Juan Pérez (cliente que reportó)
+                    subidoen: new Date(Date.now() - 30 * 60 * 1000), // Hace 30 minutos
+                  },
+                  {
+                    rutaarchivo: "evidencias/error_facturacion_log.txt",
+                    usuario: { connect: { id: 3 } }, // Carlos Rodríguez (técnico)
+                    subidoen: new Date(Date.now() - 15 * 60 * 1000), // Hace 15 minutos
+                  }
+                ]
+              }
             }
           ]
         },
@@ -366,6 +380,21 @@ const main = async () => {
               estadonuevo: EstadoTiquete.EN_PROGRESO,
               observacion: "Iniciando diagnóstico del error en reportes",
               usuarioCambio: { connect: { id: 4 } }, // Ana López
+             
+              imagenes: {
+                create: [
+                  {
+                    rutaarchivo: "evidencias/error_500_screenshot.png",
+                    usuario: { connect: { id: 6 } }, // Laura Martínez (cliente)
+                    subidoen: new Date(Date.now() - 2 * 60 * 60 * 1000), // Hace 2 horas
+                  },
+                  {
+                    rutaarchivo: "evidencias/server_logs_reportes.log",
+                    usuario: { connect: { id: 4 } }, // Ana López (técnico)
+                    subidoen: new Date(Date.now() - 1 * 60 * 60 * 1000), // Hace 1 hora
+                  }
+                ]
+              }
             }
           ]
         },
@@ -415,6 +444,16 @@ const main = async () => {
               estadonuevo: EstadoTiquete.EN_PROGRESO,
               observacion: "Asignado a técnico, procesando solicitud de acceso",
               usuarioCambio: { connect: { id: 7 } }, // Roberto Silva
+           
+              imagenes: {
+                create: [
+                  {
+                    rutaarchivo: "evidencias/formulario_acceso_firmado.pdf",
+                    usuario: { connect: { id: 5 } }, // Juan Pérez (cliente)
+                    subidoen: new Date(Date.now() - 3 * 60 * 60 * 1000), // Hace 3 horas
+                  }
+                ]
+              }
             }
           ]
         },
@@ -465,6 +504,26 @@ const main = async () => {
               estadonuevo: EstadoTiquete.ASIGNADO,
               observacion: "Ticket de seguridad asignado por alta prioridad",
               usuarioCambio: { connect: { id: 1 } }, // Admin
+         
+              imagenes: {
+                create: [
+                  {
+                    rutaarchivo: "evidencias/ips_sospechosas_reporte.pdf",
+                    usuario: { connect: { id: 8 } }, // Patricia Morales (técnico)
+                    subidoen: new Date(Date.now() - 45 * 60 * 1000), // Hace 45 minutos
+                  },
+                  {
+                    rutaarchivo: "evidencias/firewall_logs_intrusos.txt",
+                    usuario: { connect: { id: 8 } }, // Patricia Morales
+                    subidoen: new Date(Date.now() - 20 * 60 * 1000), // Hace 20 minutos
+                  },
+                  {
+                    rutaarchivo: "evidencias/analisis_trafico_red.pcap",
+                    usuario: { connect: { id: 8 } }, // Patricia Morales
+                    subidoen: new Date(Date.now() - 10 * 60 * 1000), // Hace 10 minutos
+                  }
+                ]
+              }
             }
           ]
         },
@@ -484,7 +543,7 @@ const main = async () => {
       },
     });
 
-    // Ticket 5 - Capacitación (Resuelto)
+    // Ticket 5 - Capacitación
     await prisma.tiquete.create({
       data: {
         titulo: "Capacitación sobre nuevas herramientas de desarrollo",
@@ -527,6 +586,21 @@ const main = async () => {
               observacion: "Información de capacitación enviada al cliente",
               usuarioCambio: { connect: { id: 7 } }, // Roberto Silva
               cambiadoen: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 día atrás
+              
+              imagenes: {
+                create: [
+                  {
+                    rutaarchivo: "evidencias/catalogo_cursos_2024.pdf",
+                    usuario: { connect: { id: 7 } }, // Roberto Silva (técnico)
+                    subidoen: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // Hace 1 día
+                  },
+                  {
+                    rutaarchivo: "evidencias/cronograma_capacitaciones.xlsx",
+                    usuario: { connect: { id: 7 } }, // Roberto Silva
+                    subidoen: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // Hace 1 día
+                  }
+                ]
+              }
             }
           ]
         },
@@ -556,7 +630,7 @@ const main = async () => {
       },
     });
 
-    console.log("🌱 Base de datos poblada exitosamente con patrón connect!");
+    console.log(" Base de datos poblada exitosamente con patrón connect e imágenes incluidas!");
 
   } catch (error) {
     console.error("Error al poblar la base de datos:", error);
