@@ -630,10 +630,10 @@ const main = async () => {
       },
     });
 
-    console.log(" Base de datos poblada exitosamente con patrón connect e imágenes incluidas!");
+    console.log(" Base de datos exitosamente creada con los datos!");
 
   } catch (error) {
-    console.error("Error al poblar la base de datos:", error);
+    console.error("Error al insertar los datos en la DB:", error);
     throw error;
   }
 };
