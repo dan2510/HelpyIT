@@ -6,6 +6,7 @@ export class TecnicoController {
   prisma = new PrismaClient();
 
   // Listado de técnicos - máximo 3 campos según requerimiento
+  // Retorna estructura: { success: boolean, data: { tecnicos: TecnicoListItem[] } }
   get = async (request: Request, response: Response, next: NextFunction) => {
     try {
       // Obtener todos los usuarios con rol TECNICO
@@ -27,13 +28,26 @@ export class TecnicoController {
         }
       });
 
-      response.json(listadoTecnicos);
+      // Estructura esperada por el servicio frontend
+      const responseData = {
+        success: true,
+        data: {
+          tecnicos: listadoTecnicos,
+          total: listadoTecnicos.length,
+          page: 1,
+          limit: listadoTecnicos.length,
+          totalPages: 1
+        }
+      };
+
+      response.json(responseData);
     } catch (error) {
       next(error);
     }
   };
 
   // Detalle completo del técnico por ID
+  // Retorna estructura: { success: boolean, data: { tecnico: TecnicoDetail } }
   getById = async (request: Request, response: Response, next: NextFunction) => {
     try {
       const idTecnico = parseInt(request.params.id);
@@ -88,16 +102,51 @@ export class TecnicoController {
         return next(AppError.notFound("No existe el técnico"));
       }
 
-      // Formatear la respuesta según los requerimientos
-      const response_data = {
+      // Calcular estadísticas básicas
+      const [ticketsTotal, ticketsResueltos, ticketsEnProgreso] = await Promise.all([
+        this.prisma.tiquete.count({
+          where: { idtecnicoactual: idTecnico }
+        }),
+        this.prisma.tiquete.count({
+          where: { idtecnicoactual: idTecnico, estado: "RESUELTO" }
+        }),
+        this.prisma.tiquete.count({
+          where: { 
+            idtecnicoactual: idTecnico,
+            estado: { in: ["EN_PROGRESO", "ASIGNADO", "PENDIENTE"] }
+          }
+        })
+      ]);
+
+      // Formatear especialidades según la estructura esperada
+      const especialidades = tecnico.especialidades.map(esp => ({
+        id: esp.especialidad.id,
+        nombre: esp.especialidad.nombre,
+        descripcion: esp.especialidad.descripcion,
+        nivelexperiencia: esp.nivelexperiencia,
+        asignadoen: esp.asignadoen
+      }));
+
+      // Formatear tickets activos
+      const ticketsActivos = tecnico.tiquetesComoTecnico.map(ticket => ({
+        id: ticket.id,
+        titulo: ticket.titulo,
+        estado: ticket.estado,
+        prioridad: ticket.prioridad
+      }));
+
+      // Estructura de datos según TecnicoDetail interface
+      const tecnicoDetail = {
         // Información personal del técnico
         id: tecnico.id,
-        nombrecompleto: tecnico.nombrecompleto,
         correo: tecnico.correo,
+        nombrecompleto: tecnico.nombrecompleto,
         telefono: tecnico.telefono,
+        idrol: tecnico.idrol,
         activo: tecnico.activo,
-        
-        // Carga de trabajo y disponibilidad
+        ultimoiniciosesion: tecnico.ultimoiniciosesion,
+        creadoen: tecnico.creadoen,
+        actualizadoen: tecnico.actualizadoen,
         disponibilidad: tecnico.disponibilidad,
         cargaactual: tecnico.cargaactual,
         maxticketsimultaneos: tecnico.maxticketsimultaneos,
@@ -105,25 +154,30 @@ export class TecnicoController {
         // Información del rol
         rol: tecnico.rol,
         
-        // Lista de especialidades
-        especialidades: tecnico.especialidades.map(esp => ({
-          id: esp.especialidad.id,
-          nombre: esp.especialidad.nombre,
-          descripcion: esp.especialidad.descripcion,
-          nivelexperiencia: esp.nivelexperiencia,
-          asignadoen: esp.asignadoen
-        })),
+        // Lista de especialidades formateada
+        especialidades: especialidades,
         
         // Tickets activos asignados
-        ticketsActivos: tecnico.tiquetesComoTecnico,
+        ticketsActivos: ticketsActivos,
         
-        // Fechas de gestión
-        creadoen: tecnico.creadoen,
-        actualizadoen: tecnico.actualizadoen,
-        ultimoiniciosesion: tecnico.ultimoiniciosesion
+        // Estadísticas calculadas
+        estadisticas: {
+          ticketsTotal: ticketsTotal,
+          ticketsResueltos: ticketsResueltos,
+          ticketsEnProgreso: ticketsEnProgreso,
+          porcentajeEfectividad: ticketsTotal > 0 ? Math.round((ticketsResueltos / ticketsTotal) * 100) : 0
+        }
       };
 
-      response.status(200).json(response_data);
+      // Estructura esperada por el servicio frontend
+      const responseData = {
+        success: true,
+        data: {
+          tecnico: tecnicoDetail
+        }
+      };
+
+      response.status(200).json(responseData);
     } catch (error: any) {
       next(error);
     }
@@ -132,13 +186,13 @@ export class TecnicoController {
   // Búsqueda de técnicos por nombre o especialidad
   search = async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const { termino } = request.query;
+      const { q } = request.query;
 
-      if (typeof termino !== "string" || termino.trim() === "") {
+      if (typeof q !== "string" || q.trim() === "") {
         return next(AppError.badRequest("El término de búsqueda es requerido"));
       }
 
-      const searchTerm: string = termino as string;
+      const searchTerm: string = q as string;
       
       const tecnicos = await this.prisma.usuario.findMany({
         where: {
@@ -178,16 +232,7 @@ export class TecnicoController {
           id: true,
           nombrecompleto: true,
           disponibilidad: true,
-          cargaactual: true,
-          especialidades: {
-            select: {
-              especialidad: {
-                select: {
-                  nombre: true
-                }
-              }
-            }
-          }
+          cargaactual: true
         },
         orderBy: {
           nombrecompleto: "asc"
@@ -264,14 +309,12 @@ export class TecnicoController {
 
       // Obtener estadísticas
       const [ticketsTotal, ticketsResueltos, ticketsEnProceso, promedioValoracion] = await Promise.all([
-        // Total de tickets asignados
         this.prisma.tiquete.count({
           where: {
             idtecnicoactual: idTecnico
           }
         }),
         
-        // Tickets resueltos
         this.prisma.tiquete.count({
           where: {
             idtecnicoactual: idTecnico,
@@ -279,7 +322,6 @@ export class TecnicoController {
           }
         }),
         
-        // Tickets en proceso
         this.prisma.tiquete.count({
           where: {
             idtecnicoactual: idTecnico,
@@ -289,7 +331,6 @@ export class TecnicoController {
           }
         }),
         
-        // Promedio de valoración
         this.prisma.valoracionServicio.aggregate({
           where: {
             tiquete: {
