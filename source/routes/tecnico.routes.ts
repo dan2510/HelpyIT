@@ -1,29 +1,31 @@
 import { Router } from "express";
-import { VideojuegoController } from "../controllers/videojuegoController";
-export class VideojuegoRoutes {
+import { TecnicoController } from "../controllers/tecnicoController";
+
+export class TecnicoRoutes {
   static get routes(): Router {
     const router = Router();
-    const controller = new VideojuegoController();
-    //localhost:3000/videojuego/
-    router.get("/", controller.get);
-    //localhost:3000/videojuego/search?clave=valor
+    const controller = new TecnicoController();
+
+    // Ruta para búsqueda de técnicos - debe ir antes que /:id
+    // GET /api/tecnicos/search?termino=carlos
     router.get("/search", controller.search);
-    //-------- Route con autorización --------
-    /* router.get(
-      "/:id",
-      authenticateJWT, // 1. verificar token JWT
-      authorizeRoles(Role.ADMIN), // 2. verificar que el rol sea ADMIN
-      controller.getById
-    ); */
-    //localhost:3000/videojuego/2
-    router.get(
-      "/:id",
-      controller.getById
-    );
-    //Crear videojuego
-    router.post("/", controller.create);
-    //Actualizar videojuego
-    router.put("/:id", controller.update);
+    
+    // Ruta para obtener técnicos disponibles
+    // GET /api/tecnicos/disponibles
+    router.get("/disponibles", controller.getDisponibles);
+
+    // Ruta para listado general de técnicos (máximo 3 campos)
+    // GET /api/tecnicos/
+    router.get("/", controller.get);
+    
+    // Ruta para detalle completo de un técnico por ID
+    // GET /api/tecnicos/:id
+    router.get("/:id", controller.getById);
+    
+    // Ruta para estadísticas de un técnico específico
+    // GET /api/tecnicos/:id/estadisticas
+    router.get("/:id/estadisticas", controller.getEstadisticas);
+
     return router;
   }
 }
