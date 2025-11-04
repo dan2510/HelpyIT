@@ -5,7 +5,7 @@ import { PrismaClient, RoleNombre } from "../../generated/prisma";
 export class TecnicoController {
   prisma = new PrismaClient();
 
-  // Listado de técnicos - máximo 3 campos según requerimiento
+  // Listado de técnicos -
   // Retorna estructura: { success: boolean, data: { tecnicos: TecnicoListItem[] } }
   get = async (request: Request, response: Response, next: NextFunction) => {
     try {
