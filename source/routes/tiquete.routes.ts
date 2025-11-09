@@ -6,10 +6,14 @@ export class TiqueteRoutes {
     const router = Router();
     const controller = new TiqueteController();
 
+         router.get("/usuario/:idUsuario", controller.getTiquetesPorUsuario);
+
     // Ruta para listado general de tiquetes (admin)
     // GET /api/tiquetes/
     router.get("/", controller.get);
     
+
+
     // Ruta para detalle completo de un tiquete por ID
     // GET /api/tiquetes/:id
     router.get("/:id", controller.getById);
