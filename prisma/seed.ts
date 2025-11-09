@@ -630,7 +630,135 @@ const main = async () => {
       },
     });
 
-    console.log(" Base de datos exitosamente creada con los datos!");
+    // Agregar al final de tu seed.ts, DESPUÉS de los 5 tickets existentes:
+
+// ========== TICKETS PARA VISTA DE ASIGNACIONES (SEMANA ACTUAL) ==========
+
+// Función helper para obtener fechas de la semana actual
+const obtenerSemanaActual = () => {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  
+  const lunes = new Date(now);
+  lunes.setDate(now.getDate() + diff);
+  lunes.setHours(10, 0, 0, 0);
+  
+  return {
+    lunes: new Date(lunes),
+    martes: new Date(lunes.setDate(lunes.getDate() + 1)),
+    miercoles: new Date(lunes.setDate(lunes.getDate() + 1)),
+    jueves: new Date(lunes.setDate(lunes.getDate() + 1)),
+    viernes: new Date(lunes.setDate(lunes.getDate() + 1))
+  };
+};
+
+const semana = obtenerSemanaActual();
+
+// Ticket 6 - PENDIENTE (Lunes)
+await prisma.tiquete.create({
+  data: {
+    titulo: "Actualización de software pendiente",
+    descripcion: "Requiere actualización del sistema operativo en servidor de producción",
+    prioridad: Prioridad.MEDIA,
+    estado: EstadoTiquete.PENDIENTE,
+    categoria: { connect: { id: 8 } },
+    cliente: { connect: { id: 5 } },
+    tecnicoActual: { connect: { id: 3 } },
+    creadoen: semana.lunes,
+    vencerespuesta: new Date(semana.lunes.getTime() + 4 * 60 * 60 * 1000),
+    venceresolucion: new Date(semana.lunes.getTime() + 24 * 60 * 60 * 1000),
+  },
+});
+
+// Ticket 7 - ASIGNADO (Martes)
+await prisma.tiquete.create({
+  data: {
+    titulo: "Configuración de firewall para nuevo servidor",
+    descripcion: "Se requiere configurar firewall para servidor recién instalado",
+    prioridad: Prioridad.ALTA,
+    estado: EstadoTiquete.ASIGNADO,
+    categoria: { connect: { id: 2 } },
+    cliente: { connect: { id: 6 } },
+    tecnicoActual: { connect: { id: 3 } },
+    creadoen: semana.martes,
+    vencerespuesta: new Date(semana.martes.getTime() + 1 * 60 * 60 * 1000),
+    venceresolucion: new Date(semana.martes.getTime() + 8 * 60 * 60 * 1000),
+  },
+});
+
+// Ticket 8 - EN_PROGRESO (Miércoles - primera asignación)
+await prisma.tiquete.create({
+  data: {
+    titulo: "Migración de base de datos",
+    descripcion: "Migración de BD de desarrollo a producción",
+    prioridad: Prioridad.ALTA,
+    estado: EstadoTiquete.EN_PROGRESO,
+    categoria: { connect: { id: 2 } },
+    cliente: { connect: { id: 9 } },
+    tecnicoActual: { connect: { id: 3 } },
+    creadoen: new Date(semana.miercoles.setHours(9, 0, 0, 0)),
+    vencerespuesta: new Date(semana.miercoles.getTime() + 1 * 60 * 60 * 1000),
+    venceresolucion: new Date(semana.miercoles.getTime() + 8 * 60 * 60 * 1000),
+  },
+});
+
+// Ticket 9 - ABIERTO (Miércoles - segunda asignación del mismo día)
+await prisma.tiquete.create({
+  data: {
+    titulo: "Soporte para instalación de aplicación",
+    descripcion: "Usuario requiere asistencia para instalar nueva herramienta",
+    prioridad: Prioridad.BAJA,
+    estado: EstadoTiquete.ABIERTO,
+    categoria: { connect: { id: 9 } },
+    cliente: { connect: { id: 5 } },
+    tecnicoActual: { connect: { id: 3 } },
+    creadoen: new Date(semana.miercoles.setHours(14, 30, 0, 0)),
+    vencerespuesta: new Date(semana.miercoles.getTime() + 30 * 60 * 1000),
+    venceresolucion: new Date(semana.miercoles.getTime() + 2 * 60 * 60 * 1000),
+  },
+});
+
+// Ticket 10 - RESUELTO (Jueves)
+await prisma.tiquete.create({
+  data: {
+    titulo: "Consulta sobre backup automático",
+    descripcion: "Cliente solicita información sobre política de backups",
+    prioridad: Prioridad.BAJA,
+    estado: EstadoTiquete.RESUELTO,
+    categoria: { connect: { id: 7 } },
+    cliente: { connect: { id: 6 } },
+    tecnicoActual: { connect: { id: 3 } },
+    creadoen: semana.jueves,
+    resueltoen: new Date(semana.jueves.getTime() + 2 * 60 * 60 * 1000),
+    vencerespuesta: new Date(semana.jueves.getTime() + 8 * 60 * 60 * 1000),
+    venceresolucion: new Date(semana.jueves.getTime() + 72 * 60 * 60 * 1000),
+    cumplioslarespuesta: true,
+    cumplioslaresolucion: true,
+  },
+});
+
+// Ticket 11 - CERRADO (Viernes)
+await prisma.tiquete.create({
+  data: {
+    titulo: "Problema de conectividad resuelto",
+    descripcion: "Usuario reportó problemas de conexión a red, ya solucionado",
+    prioridad: Prioridad.MEDIA,
+    estado: EstadoTiquete.CERRADO,
+    categoria: { connect: { id: 3 } },
+    cliente: { connect: { id: 9 } },
+    tecnicoActual: { connect: { id: 3 } },
+    creadoen: semana.viernes,
+    resueltoen: new Date(semana.viernes.getTime() + 3 * 60 * 60 * 1000),
+    cerradoen: new Date(semana.viernes.getTime() + 4 * 60 * 60 * 1000),
+    vencerespuesta: new Date(semana.viernes.getTime() + 4 * 60 * 60 * 1000),
+    venceresolucion: new Date(semana.viernes.getTime() + 24 * 60 * 60 * 1000),
+    cumplioslarespuesta: true,
+    cumplioslaresolucion: true,
+  },
+});
+
+
 
   } catch (error) {
     console.error("Error al insertar los datos en la DB:", error);

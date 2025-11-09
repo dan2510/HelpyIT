@@ -2,6 +2,7 @@ import { Router } from "express";
 import { TecnicoRoutes } from "./tecnico.routes"
 import { CategoriaRoutes } from "./categoria.routes";
 import { TiqueteRoutes } from "./tiquete.routes";
+import { AsignacionRoutes } from "./asignacion.routes"; 
 
 export class AppRoutes {
   static get routes(): Router {
@@ -10,6 +11,7 @@ export class AppRoutes {
     router.use("/tecnicos", TecnicoRoutes.routes);
     router.use("/categorias", CategoriaRoutes.routes);
     router.use("/tiquetes", TiqueteRoutes.routes);
+      router.use("/asignaciones", AsignacionRoutes.routes);
 
     return router;
   }
