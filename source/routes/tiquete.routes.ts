@@ -6,10 +6,6 @@ export class TiqueteRoutes {
     const router = Router();
     const controller = new TiqueteController();
 
-    // Ruta para obtener tiquetes por usuario (filtra según rol)
-    // GET /api/tiquetes/usuario/:idUsuario
-    router.get("/usuario/:idUsuario", controller.getTiquetesPorUsuario);
-
     // Ruta para listado general de tiquetes (admin)
     // GET /api/tiquetes/
     router.get("/", controller.get);
