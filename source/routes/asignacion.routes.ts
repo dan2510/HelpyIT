@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { AsignacionController } from "../controllers/AsignacionController";
+import { AsignacionController } from "../controllers/asignacionController";
 
 export class AsignacionRoutes {
   static get routes(): Router {

@@ -21,21 +21,40 @@ export class TecnicoController {
           id: true,
           nombrecompleto: true,
           disponibilidad: true,
-          cargaactual: true
+          cargaactual: true,
+        
+          tiquetesComoTecnico: {
+            where: {
+              estado: {
+                in: ["ABIERTO", "EN_PROGRESO", "ASIGNADO", "PENDIENTE"]
+              }
+            },
+            select: {
+              id: true
+            }
+          }
         },
         orderBy: {
           nombrecompleto: "asc"
         }
       });
 
+    
+      const tecnicosConCargaReal = listadoTecnicos.map(tecnico => ({
+        id: tecnico.id,
+        nombrecompleto: tecnico.nombrecompleto,
+        disponibilidad: tecnico.disponibilidad,
+        cargaactual: tecnico.tiquetesComoTecnico.length 
+      }));
+
       // Estructura esperada por el servicio frontend
       const responseData = {
         success: true,
         data: {
-          tecnicos: listadoTecnicos,
-          total: listadoTecnicos.length,
+          tecnicos: tecnicosConCargaReal,
+          total: tecnicosConCargaReal.length,
           page: 1,
-          limit: listadoTecnicos.length,
+          limit: tecnicosConCargaReal.length,
           totalPages: 1
         }
       };
@@ -102,6 +121,9 @@ export class TecnicoController {
         return next(AppError.notFound("No existe el técnico"));
       }
 
+  
+      const cargaActualReal = tecnico.tiquetesComoTecnico.length;
+
       // Calcular estadísticas básicas
       const [ticketsTotal, ticketsResueltos, ticketsEnProgreso] = await Promise.all([
         this.prisma.tiquete.count({
@@ -110,10 +132,11 @@ export class TecnicoController {
         this.prisma.tiquete.count({
           where: { idtecnicoactual: idTecnico, estado: "RESUELTO" }
         }),
+       
         this.prisma.tiquete.count({
           where: { 
             idtecnicoactual: idTecnico,
-            estado: { in: ["EN_PROGRESO", "ASIGNADO", "PENDIENTE"] }
+            estado: { in: ["ABIERTO", "EN_PROGRESO", "ASIGNADO", "PENDIENTE"] }
           }
         })
       ]);
@@ -148,7 +171,7 @@ export class TecnicoController {
         creadoen: tecnico.creadoen,
         actualizadoen: tecnico.actualizadoen,
         disponibilidad: tecnico.disponibilidad,
-        cargaactual: tecnico.cargaactual,
+        cargaactual: cargaActualReal,  
         maxticketsimultaneos: tecnico.maxticketsimultaneos,
         
         // Información del rol
@@ -164,8 +187,7 @@ export class TecnicoController {
         estadisticas: {
           ticketsTotal: ticketsTotal,
           ticketsResueltos: ticketsResueltos,
-          ticketsEnProgreso: ticketsEnProgreso,
-          porcentajeEfectividad: ticketsTotal > 0 ? Math.round((ticketsResueltos / ticketsTotal) * 100) : 0
+          ticketsEnProgreso: ticketsEnProgreso, 
         }
       };
 
@@ -322,11 +344,12 @@ export class TecnicoController {
           }
         }),
         
+      
         this.prisma.tiquete.count({
           where: {
             idtecnicoactual: idTecnico,
             estado: {
-              in: ["EN_PROGRESO", "ASIGNADO", "PENDIENTE"]
+              in: ["ABIERTO", "EN_PROGRESO", "ASIGNADO", "PENDIENTE"]
             }
           }
         }),
