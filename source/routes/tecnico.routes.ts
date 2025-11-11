@@ -14,7 +14,7 @@ export class TecnicoRoutes {
     // GET /api/tecnicos/disponibles
     router.get("/disponibles", controller.getDisponibles);
 
-    // Ruta para listado general de técnicos (máximo 3 campos)
+    // Ruta para listado general de técnicos 
     // GET /api/tecnicos/
     router.get("/", controller.get);
     
