@@ -1,0 +1,22 @@
+2025-11-15 13:57:20.872 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `this.prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\controllers\tiqueteController.ts:19:49
+
+  16 }
+  17 
+  18 // Obtener el usuario y su rol
+→ 19 const usuario = await this.prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
+2025-11-15 13:57:26.119 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `this.prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\controllers\tiqueteController.ts:19:49
+
+  16 }
+  17 
+  18 // Obtener el usuario y su rol
+→ 19 const usuario = await this.prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
