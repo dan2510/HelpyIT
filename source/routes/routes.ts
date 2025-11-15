@@ -3,6 +3,7 @@ import { TecnicoRoutes } from "./tecnico.routes"
 import { CategoriaRoutes } from "./categoria.routes";
 import { TiqueteRoutes } from "./tiquete.routes";
 import { AsignacionRoutes } from "./asignacion.routes"; 
+import { ImageRoutes } from "./image.routes";
 
 export class AppRoutes {
   static get routes(): Router {
@@ -12,6 +13,7 @@ export class AppRoutes {
     router.use("/categorias", CategoriaRoutes.routes);
     router.use("/tiquetes", TiqueteRoutes.routes);
       router.use("/asignaciones", AsignacionRoutes.routes);
+        router.use("/file/", ImageRoutes.routes);
 
     return router;
   }
