@@ -51,14 +51,14 @@ const main = async () => {
       },
     });
 
-    // Usuario 2 - Supervisor (sin especialidades)
+    // Usuario 2 - Cliente (sin especialidades)
     await prisma.usuario.create({
       data: {
         correo: "cliente@ibm.com",
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "María González",
         telefono: "123-456-7891",
-        rol: { connect: { id: 2 } },
+        rol: { connect: { id: 3 } },
         activo: true,
         disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 0,
@@ -73,7 +73,7 @@ const main = async () => {
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "Carlos Rodríguez",
         telefono: "123-456-7892",
-        rol: { connect: { id: 3 } },
+        rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 3,
@@ -104,7 +104,7 @@ const main = async () => {
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "Ana López",
         telefono: "123-456-7893",
-        rol: { connect: { id: 3 } },
+        rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 2,
@@ -159,7 +159,7 @@ const main = async () => {
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "Roberto Silva",
         telefono: "123-456-7894",
-        rol: { connect: { id: 3 } },
+        rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.DISPONIBLE,
         cargaactual: 1,
@@ -186,7 +186,7 @@ const main = async () => {
         contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
         nombrecompleto: "Patricia Morales",
         telefono: "123-456-7895",
-        rol: { connect: { id: 3 } },
+        rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.OCUPADO,
         cargaactual: 4,
@@ -320,14 +320,9 @@ const main = async () => {
               imagenes: {
                 create: [
                   {
-                    rutaarchivo: "evidencias/error_facturacion_pantalla1.png",
+                    rutaarchivo: "Sistema de facturación no responde.jpeg",
                     usuario: { connect: { id: 5 } }, // Juan Pérez (cliente que reportó)
                     subidoen: new Date(Date.now() - 30 * 60 * 1000), // Hace 30 minutos
-                  },
-                  {
-                    rutaarchivo: "evidencias/error_facturacion_log.txt",
-                    usuario: { connect: { id: 3 } }, // Carlos Rodríguez (técnico)
-                    subidoen: new Date(Date.now() - 15 * 60 * 1000), // Hace 15 minutos
                   }
                 ]
               }
@@ -384,14 +379,9 @@ const main = async () => {
               imagenes: {
                 create: [
                   {
-                    rutaarchivo: "evidencias/error_500_screenshot.png",
+                    rutaarchivo: "Error en módulo de reportes.png",
                     usuario: { connect: { id: 6 } }, // Laura Martínez (cliente)
                     subidoen: new Date(Date.now() - 2 * 60 * 60 * 1000), // Hace 2 horas
-                  },
-                  {
-                    rutaarchivo: "evidencias/server_logs_reportes.log",
-                    usuario: { connect: { id: 4 } }, // Ana López (técnico)
-                    subidoen: new Date(Date.now() - 1 * 60 * 60 * 1000), // Hace 1 hora
                   }
                 ]
               }
@@ -448,7 +438,7 @@ const main = async () => {
               imagenes: {
                 create: [
                   {
-                    rutaarchivo: "evidencias/formulario_acceso_firmado.pdf",
+                    rutaarchivo: "Solicitud de acceso a carpeta compartida.png",
                     usuario: { connect: { id: 5 } }, // Juan Pérez (cliente)
                     subidoen: new Date(Date.now() - 3 * 60 * 60 * 1000), // Hace 3 horas
                   }
@@ -508,19 +498,9 @@ const main = async () => {
               imagenes: {
                 create: [
                   {
-                    rutaarchivo: "evidencias/ips_sospechosas_reporte.pdf",
+                    rutaarchivo: "Deteccion de actividad sospechosa en servidor.jpg",
                     usuario: { connect: { id: 8 } }, // Patricia Morales (técnico)
                     subidoen: new Date(Date.now() - 45 * 60 * 1000), // Hace 45 minutos
-                  },
-                  {
-                    rutaarchivo: "evidencias/firewall_logs_intrusos.txt",
-                    usuario: { connect: { id: 8 } }, // Patricia Morales
-                    subidoen: new Date(Date.now() - 20 * 60 * 1000), // Hace 20 minutos
-                  },
-                  {
-                    rutaarchivo: "evidencias/analisis_trafico_red.pcap",
-                    usuario: { connect: { id: 8 } }, // Patricia Morales
-                    subidoen: new Date(Date.now() - 10 * 60 * 1000), // Hace 10 minutos
                   }
                 ]
               }
@@ -590,13 +570,8 @@ const main = async () => {
               imagenes: {
                 create: [
                   {
-                    rutaarchivo: "evidencias/catalogo_cursos_2024.pdf",
+                    rutaarchivo: "Capacitación sobre nuevas herramientas de desarrollo.png",
                     usuario: { connect: { id: 7 } }, // Roberto Silva (técnico)
-                    subidoen: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // Hace 1 día
-                  },
-                  {
-                    rutaarchivo: "evidencias/cronograma_capacitaciones.xlsx",
-                    usuario: { connect: { id: 7 } }, // Roberto Silva
                     subidoen: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // Hace 1 día
                   }
                 ]
