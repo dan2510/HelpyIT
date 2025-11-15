@@ -124,23 +124,6 @@ export class TecnicoController {
   
       const cargaActualReal = tecnico.tiquetesComoTecnico.length;
 
-      // Calcular estadísticas básicas
-      const [ticketsTotal, ticketsResueltos, ticketsEnProgreso] = await Promise.all([
-        this.prisma.tiquete.count({
-          where: { idtecnicoactual: idTecnico }
-        }),
-        this.prisma.tiquete.count({
-          where: { idtecnicoactual: idTecnico, estado: "RESUELTO" }
-        }),
-       
-        this.prisma.tiquete.count({
-          where: { 
-            idtecnicoactual: idTecnico,
-            estado: { in: ["ABIERTO", "EN_PROGRESO", "ASIGNADO", "PENDIENTE"] }
-          }
-        })
-      ]);
-
       // Formatear especialidades según la estructura esperada
       const especialidades = tecnico.especialidades.map(esp => ({
         id: esp.especialidad.id,
@@ -181,14 +164,7 @@ export class TecnicoController {
         especialidades: especialidades,
         
         // Tickets activos asignados
-        ticketsActivos: ticketsActivos,
-        
-        // Estadísticas calculadas
-        estadisticas: {
-          ticketsTotal: ticketsTotal,
-          ticketsResueltos: ticketsResueltos,
-          ticketsEnProgreso: ticketsEnProgreso, 
-        }
+        ticketsActivos: ticketsActivos
       };
 
       // Estructura esperada por el servicio frontend
@@ -306,86 +282,4 @@ export class TecnicoController {
     }
   };
 
-  // Obtener estadísticas de un técnico
-  getEstadisticas = async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const idTecnico = parseInt(request.params.id);
-      
-      if (isNaN(idTecnico)) {
-        return next(AppError.badRequest("El ID no es válido"));
-      }
-
-      // Verificar que el técnico existe
-      const tecnico = await this.prisma.usuario.findFirst({
-        where: {
-          id: idTecnico,
-          rol: {
-            nombre: RoleNombre.TECNICO
-          }
-        }
-      });
-
-      if (!tecnico) {
-        return next(AppError.notFound("No existe el técnico"));
-      }
-
-      // Obtener estadísticas
-      const [ticketsTotal, ticketsResueltos, ticketsEnProceso, promedioValoracion] = await Promise.all([
-        this.prisma.tiquete.count({
-          where: {
-            idtecnicoactual: idTecnico
-          }
-        }),
-        
-        this.prisma.tiquete.count({
-          where: {
-            idtecnicoactual: idTecnico,
-            estado: "RESUELTO"
-          }
-        }),
-        
-      
-        this.prisma.tiquete.count({
-          where: {
-            idtecnicoactual: idTecnico,
-            estado: {
-              in: ["ABIERTO", "EN_PROGRESO", "ASIGNADO", "PENDIENTE"]
-            }
-          }
-        }),
-        
-        this.prisma.valoracionServicio.aggregate({
-          where: {
-            tiquete: {
-              idtecnicoactual: idTecnico
-            }
-          },
-          _avg: {
-            calificacion: true
-          }
-        })
-      ]);
-
-      const estadisticas = {
-        tecnico: {
-          id: tecnico.id,
-          nombre: tecnico.nombrecompleto
-        },
-        tickets: {
-          total: ticketsTotal,
-          resueltos: ticketsResueltos,
-          enProceso: ticketsEnProceso,
-          cerrados: ticketsTotal - ticketsResueltos - ticketsEnProceso
-        },
-        rendimiento: {
-          promedioValoracion: promedioValoracion._avg.calificacion || 0,
-          porcentajeResolucion: ticketsTotal > 0 ? ((ticketsResueltos / ticketsTotal) * 100) : 0
-        }
-      };
-
-      response.json(estadisticas);
-    } catch (error) {
-      next(error);
-    }
-  };
 }

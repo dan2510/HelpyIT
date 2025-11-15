@@ -60,7 +60,7 @@ export class TiqueteController {
               }
             },
             orderBy: {
-              creadoen: 'desc'
+              id: 'asc'
             }
           });
           break;
@@ -91,7 +91,7 @@ export class TiqueteController {
               }
             },
             orderBy: {
-              creadoen: 'desc'
+              id: 'asc'
             }
           });
           break;
@@ -122,7 +122,7 @@ export class TiqueteController {
               }
             },
             orderBy: {
-              creadoen: 'desc'
+              id: 'asc'
             }
           });
           break;
@@ -379,7 +379,7 @@ export class TiqueteController {
           }
         },
         orderBy: {
-          creadoen: 'desc'
+          id: 'asc'
         }
       });
 

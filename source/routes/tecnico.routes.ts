@@ -21,10 +21,6 @@ export class TecnicoRoutes {
     // Ruta para detalle completo de un técnico por ID
     // GET /api/tecnicos/:id
     router.get("/:id", controller.getById);
-    
-    // Ruta para estadísticas de un técnico específico
-    // GET /api/tecnicos/:id/estadisticas
-    router.get("/:id/estadisticas", controller.getEstadisticas);
 
     return router;
   }
