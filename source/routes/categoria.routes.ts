@@ -21,10 +21,6 @@ export class CategoriaRoutes {
     // Ruta para detalle completo de una categoría por ID
     // GET /api/categorias/:id
     router.get("/:id", controller.getById);
-    
-    // Ruta para estadísticas de una categoría específica
-    // GET /api/categorias/:id/estadisticas
-    router.get("/:id/estadisticas", controller.getEstadisticas);
 
     return router;
   }

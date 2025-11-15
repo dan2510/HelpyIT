@@ -97,14 +97,6 @@ export class CategoriaController {
                 }
               }
             }
-          },
-          // Estadísticas: contar tickets asociados
-          tiquetes: {
-            select: {
-              id: true,
-              estado: true,
-              prioridad: true
-            }
           }
         }
       });
@@ -112,18 +104,6 @@ export class CategoriaController {
       if (!categoria) {
         return next(AppError.notFound("No existe la categoría"));
       }
-
-      // Calcular estadísticas básicas
-      const ticketsTotal = categoria.tiquetes.length;
-      const ticketsAbiertos = categoria.tiquetes.filter(t => 
-        ['ABIERTO', 'ASIGNADO', 'EN_PROGRESO', 'PENDIENTE'].includes(t.estado)
-      ).length;
-      const ticketsResueltos = categoria.tiquetes.filter(t => 
-        ['RESUELTO', 'CERRADO'].includes(t.estado)
-      ).length;
-      const ticketsCriticos = categoria.tiquetes.filter(t => 
-        t.prioridad === 'CRITICA'
-      ).length;
 
       // Formatear etiquetas según la estructura esperada
       const etiquetas = categoria.etiquetas.map(etiq => ({
@@ -167,16 +147,7 @@ export class CategoriaController {
         etiquetas: etiquetas,
         
         // Lista de especialidades formateada (requerimiento)
-        especialidades: especialidades,
-        
-        // Estadísticas calculadas
-        estadisticas: {
-          ticketsTotal: ticketsTotal,
-          ticketsAbiertos: ticketsAbiertos,
-          ticketsResueltos: ticketsResueltos,
-          ticketsCriticos: ticketsCriticos,
-          porcentajeResolucion: ticketsTotal > 0 ? Math.round((ticketsResueltos / ticketsTotal) * 100) : 0
-        }
+        especialidades: especialidades
       };
 
       // Estructura esperada por el servicio frontend
@@ -280,94 +251,4 @@ export class CategoriaController {
     }
   };
 
-  // Obtener estadísticas de una categoría
-  getEstadisticas = async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      const idCategoria = parseInt(request.params.id);
-      
-      if (isNaN(idCategoria)) {
-        return next(AppError.badRequest("El ID no es válido"));
-      }
-
-      // Verificar que la categoría existe
-      const categoria = await this.prisma.categoria.findFirst({
-        where: {
-          id: idCategoria
-        },
-        include: {
-          politicaSla: true
-        }
-      });
-
-      if (!categoria) {
-        return next(AppError.notFound("No existe la categoría"));
-      }
-
-      // Obtener estadísticas de tickets
-      const [ticketsTotal, ticketsPorEstado, ticketsPorPrioridad, promedioValoracion] = await Promise.all([
-        this.prisma.tiquete.count({
-          where: {
-            idcategoria: idCategoria
-          }
-        }),
-        
-        this.prisma.tiquete.groupBy({
-          by: ['estado'],
-          where: {
-            idcategoria: idCategoria
-          },
-          _count: true
-        }),
-        
-        this.prisma.tiquete.groupBy({
-          by: ['prioridad'],
-          where: {
-            idcategoria: idCategoria
-          },
-          _count: true
-        }),
-        
-        this.prisma.valoracionServicio.aggregate({
-          where: {
-            tiquete: {
-              idcategoria: idCategoria
-            }
-          },
-          _avg: {
-            calificacion: true
-          }
-        })
-      ]);
-
-      const estadisticas = {
-        categoria: {
-          id: categoria.id,
-          nombre: categoria.nombre
-        },
-        tickets: {
-          total: ticketsTotal,
-          porEstado: ticketsPorEstado.reduce((acc, item) => {
-            acc[item.estado] = item._count;
-            return acc;
-          }, {} as any),
-          porPrioridad: ticketsPorPrioridad.reduce((acc, item) => {
-            acc[item.prioridad] = item._count;
-            return acc;
-          }, {} as any)
-        },
-        sla: {
-          nombre: categoria.politicaSla.nombre,
-          tiempoRespuesta: categoria.politicaSla.maxminutosrespuesta,
-          tiempoResolucion: categoria.politicaSla.maxminutosresolucion
-        },
-        satisfaccion: {
-          promedioValoracion: promedioValoracion._avg.calificacion || 0
-        }
-      };
-
-      response.json(estadisticas);
-    } catch (error) {
-      next(error);
-    }
-  };
 }
