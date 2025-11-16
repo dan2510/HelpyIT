@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/custom.error";
-import { PrismaClient, RoleNombre } from "../../generated/prisma";
+import { PrismaClient, RoleNombre, Disponibilidad, NivelExperiencia, EstadoTiquete } from "../../generated/prisma";
+import bcrypt from "bcrypt";
 
 export class TecnicoController {
   prisma = new PrismaClient();
@@ -26,7 +27,7 @@ export class TecnicoController {
           tiquetesComoTecnico: {
             where: {
               estado: {
-                in: ["ABIERTO", "EN_PROGRESO", "ASIGNADO", "PENDIENTE"]
+                in: [EstadoTiquete.ABIERTO, EstadoTiquete.EN_PROGRESO, EstadoTiquete.ASIGNADO, EstadoTiquete.PENDIENTE]
               }
             },
             select: {
@@ -104,7 +105,7 @@ export class TecnicoController {
           tiquetesComoTecnico: {
             where: {
               estado: {
-                in: ["ABIERTO", "EN_PROGRESO", "ASIGNADO", "PENDIENTE"]
+                in: [EstadoTiquete.ABIERTO, EstadoTiquete.EN_PROGRESO, EstadoTiquete.ASIGNADO, EstadoTiquete.PENDIENTE]
               }
             },
             select: {
@@ -252,7 +253,7 @@ export class TecnicoController {
             nombre: RoleNombre.TECNICO
           },
           activo: true,
-          disponibilidad: "DISPONIBLE"
+          disponibilidad: Disponibilidad.DISPONIBLE
         },
         select: {
           id: true,
@@ -282,4 +283,277 @@ export class TecnicoController {
     }
   };
 
+
+   create = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const {
+        correo,
+        nombrecompleto,
+        telefono,
+        contraseña,
+        especialidades, // Array de IDs: [1, 3, 6]
+        estado // 'DISPONIBLE' | 'OCUPADO' | 'AUSENTE'
+      } = request.body;
+
+      // Validaciones
+      const validationErrors: any[] = [];
+
+      if (!correo || !correo.trim()) {
+        validationErrors.push({
+          fields: ['correo'],
+          constraint: 'El correo electrónico es requerido'
+        });
+      }
+
+      // Validar formato de correo
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (correo && !emailRegex.test(correo)) {
+        validationErrors.push({
+          fields: ['correo'],
+          constraint: 'El formato del correo electrónico no es válido'
+        });
+      }
+
+      if (!nombrecompleto || !nombrecompleto.trim()) {
+        validationErrors.push({
+          fields: ['nombrecompleto'],
+          constraint: 'El nombre completo es requerido'
+        });
+      }
+
+      if (!especialidades || !Array.isArray(especialidades) || especialidades.length === 0) {
+        validationErrors.push({
+          fields: ['especialidades'],
+          constraint: 'Debe seleccionar al menos una especialidad'
+        });
+      }
+
+      if (!estado) {
+        validationErrors.push({
+          fields: ['estado'],
+          constraint: 'El estado es requerido'
+        });
+      }
+
+      if (validationErrors.length > 0) {
+        return next(AppError.badRequest('Errores de validación', validationErrors));
+      }
+
+      // Verificar si el correo ya existe
+      const existingUser = await this.prisma.usuario.findUnique({
+        where: { correo: correo.trim() }
+      });
+
+      if (existingUser) {
+        return next(AppError.badRequest('El correo electrónico ya está registrado', [
+          { fields: ['correo'], constraint: 'Este correo ya está en uso' }
+        ]));
+      }
+
+      // Obtener el ID del rol TECNICO
+      const rolTecnico = await this.prisma.rol.findFirst({
+        where: { nombre: RoleNombre.TECNICO }
+      });
+
+      if (!rolTecnico) {
+        return next(AppError.internalServer('No se encontró el rol de técnico'));
+      }
+
+      // Hash de la contraseña (usar la misma que en seed.ts)
+      const contraseñaHash = contraseña 
+        ? await bcrypt.hash(contraseña, 10)
+        : "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO";
+
+      // Crear el técnico con especialidades
+      const nuevoTecnico = await this.prisma.usuario.create({
+        data: {
+          correo: correo.trim(),
+          contrasenahash: contraseñaHash,
+          nombrecompleto: nombrecompleto.trim(),
+          telefono: telefono?.trim() || null,
+          rol: { connect: { id: rolTecnico.id } },
+          activo: true,
+          disponibilidad: estado as Disponibilidad,
+          cargaactual: 0,
+          maxticketsimultaneos: 5,
+          // Crear especialidades asociadas
+          especialidades: {
+            create: especialidades.map((idEspecialidad: number) => ({
+              especialidad: { connect: { id: idEspecialidad } },
+              nivelexperiencia: NivelExperiencia.JUNIOR // Por defecto, podría ser un campo del formulario
+            }))
+          }
+        },
+        include: {
+          rol: true,
+          especialidades: {
+            include: {
+              especialidad: true
+            }
+          }
+        }
+      });
+
+      response.status(201).json({
+        success: true,
+        message: 'Técnico creado exitosamente',
+        data: {
+          tecnico: nuevoTecnico
+        }
+      });
+    } catch (error: any) {
+      console.error('Error al crear técnico:', error);
+      next(error);
+    }
+  };
+
+  // ACTUALIZAR TÉCNICO EXISTENTE
+  update = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const idTecnico = parseInt(request.params.id);
+      
+      if (isNaN(idTecnico)) {
+        return next(AppError.badRequest("El ID no es válido"));
+      }
+
+      const {
+        correo,
+        nombrecompleto,
+        telefono,
+        especialidades, // Array de IDs: [1, 3, 6]
+        estado
+      } = request.body;
+
+      // Validaciones
+      const validationErrors: any[] = [];
+
+      if (!correo || !correo.trim()) {
+        validationErrors.push({
+          fields: ['correo'],
+          constraint: 'El correo electrónico es requerido'
+        });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (correo && !emailRegex.test(correo)) {
+        validationErrors.push({
+          fields: ['correo'],
+          constraint: 'El formato del correo electrónico no es válido'
+        });
+      }
+
+      if (!nombrecompleto || !nombrecompleto.trim()) {
+        validationErrors.push({
+          fields: ['nombrecompleto'],
+          constraint: 'El nombre completo es requerido'
+        });
+      }
+
+      if (!especialidades || !Array.isArray(especialidades) || especialidades.length === 0) {
+        validationErrors.push({
+          fields: ['especialidades'],
+          constraint: 'Debe seleccionar al menos una especialidad'
+        });
+      }
+
+      if (validationErrors.length > 0) {
+        return next(AppError.badRequest('Errores de validación', validationErrors));
+      }
+
+      // Verificar que el técnico existe
+      const tecnicoExistente = await this.prisma.usuario.findFirst({
+        where: {
+          id: idTecnico,
+          rol: { nombre: RoleNombre.TECNICO }
+        }
+      });
+
+      if (!tecnicoExistente) {
+        return next(AppError.notFound('Técnico no encontrado'));
+      }
+
+      // Verificar si el correo ya está en uso por otro usuario
+      if (correo !== tecnicoExistente.correo) {
+        const correoEnUso = await this.prisma.usuario.findFirst({
+          where: {
+            correo: correo.trim(),
+            id: { not: idTecnico }
+          }
+        });
+
+        if (correoEnUso) {
+          return next(AppError.badRequest('El correo electrónico ya está en uso', [
+            { fields: ['correo'], constraint: 'Este correo ya está registrado' }
+          ]));
+        }
+      }
+
+      // Eliminar especialidades anteriores
+      await this.prisma.usuarioEspecialidad.deleteMany({
+        where: { idusuario: idTecnico }
+      });
+
+      // Actualizar técnico con nuevas especialidades
+      const tecnicoActualizado = await this.prisma.usuario.update({
+        where: { id: idTecnico },
+        data: {
+          correo: correo.trim(),
+          nombrecompleto: nombrecompleto.trim(),
+          telefono: telefono?.trim() || null,
+          disponibilidad: estado as Disponibilidad,
+          actualizadoen: new Date(),
+          // Crear nuevas especialidades
+          especialidades: {
+            create: especialidades.map((idEspecialidad: number) => ({
+              especialidad: { connect: { id: idEspecialidad } },
+              nivelexperiencia: NivelExperiencia.JUNIOR
+            }))
+          }
+        },
+        include: {
+          rol: true,
+          especialidades: {
+            include: {
+              especialidad: true
+            }
+          }
+        }
+      });
+
+      response.status(200).json({
+        success: true,
+        message: 'Técnico actualizado exitosamente',
+        data: {
+          tecnico: tecnicoActualizado
+        }
+      });
+    } catch (error: any) {
+      console.error('Error al actualizar técnico:', error);
+      next(error);
+    }
+  };
+
+  // OBTENER ESPECIALIDADES DISPONIBLES (para el select del formulario)
+  getEspecialidades = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const especialidades = await this.prisma.especialidad.findMany({
+        where: { activo: true },
+        select: {
+          id: true,
+          nombre: true,
+          descripcion: true
+        },
+        orderBy: { nombre: 'asc' }
+      });
+
+      response.json({
+        success: true,
+        data: { especialidades }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+
+

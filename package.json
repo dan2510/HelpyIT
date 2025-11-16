@@ -12,6 +12,7 @@
   "license": "ISC",
   "devDependencies": {
     "@prisma/client": "^6.18.0",
+    "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
@@ -41,6 +42,7 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.28"
+    "@anthropic-ai/claude-agent-sdk": "^0.1.28",
+    "bcrypt": "^6.0.0"
   }
 }

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/custom.error";
-import { PrismaClient, RoleNombre } from "../../generated/prisma";
+import { PrismaClient, RoleNombre, EstadoTiquete } from "../../generated/prisma";
 
 export class TiqueteController {
   prisma = new PrismaClient();
@@ -395,6 +395,212 @@ export class TiqueteController {
       };
 
       response.json(responseData);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // CREAR NUEVO TICKET
+  create = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const {
+        titulo,
+        descripcion,
+        prioridad,
+        idetiqueta, // ID de la etiqueta seleccionada
+        idcliente // ID del usuario solicitante (desde variable en lógica del frontend)
+      } = request.body;
+
+      // Validaciones
+      const validationErrors: any[] = [];
+
+      if (!titulo || !titulo.trim()) {
+        validationErrors.push({
+          fields: ['titulo'],
+          constraint: 'El título es requerido'
+        });
+      }
+
+      if (!descripcion || !descripcion.trim()) {
+        validationErrors.push({
+          fields: ['descripcion'],
+          constraint: 'La descripción es requerida'
+        });
+      }
+
+      if (!prioridad) {
+        validationErrors.push({
+          fields: ['prioridad'],
+          constraint: 'La prioridad es requerida'
+        });
+      }
+
+      if (!idetiqueta) {
+        validationErrors.push({
+          fields: ['idetiqueta'],
+          constraint: 'Debe seleccionar una etiqueta'
+        });
+      }
+
+      if (!idcliente) {
+        validationErrors.push({
+          fields: ['idcliente'],
+          constraint: 'El usuario solicitante es requerido'
+        });
+      }
+
+      if (validationErrors.length > 0) {
+        return next(AppError.badRequest('Errores de validación', validationErrors));
+      }
+
+      // Obtener la categoría asociada a la etiqueta
+      const categoriaEtiqueta = await this.prisma.categoriaEtiqueta.findFirst({
+        where: { idetiqueta: parseInt(idetiqueta) },
+        include: {
+          categoria: {
+            include: {
+              politicaSla: true
+            }
+          }
+        }
+      });
+
+      if (!categoriaEtiqueta) {
+        return next(AppError.badRequest('No se encontró una categoría para la etiqueta seleccionada'));
+      }
+
+      const categoria = categoriaEtiqueta.categoria;
+      const sla = categoria.politicaSla;
+
+      // Calcular fechas de vencimiento SLA
+      const fechaCreacion = new Date();
+      const venceRespuesta = new Date(fechaCreacion.getTime() + sla.maxminutosrespuesta * 60 * 1000);
+      const venceResolucion = new Date(fechaCreacion.getTime() + sla.maxminutosresolucion * 60 * 1000);
+
+      // Crear el ticket
+      const nuevoTicket = await this.prisma.tiquete.create({
+        data: {
+          titulo: titulo.trim(),
+          descripcion: descripcion.trim(),
+          prioridad: prioridad,
+          estado: EstadoTiquete.PENDIENTE,
+          categoria: { connect: { id: categoria.id } },
+          cliente: { connect: { id: parseInt(idcliente) } },
+          creadoen: fechaCreacion,
+          vencerespuesta: venceRespuesta,
+          venceresolucion: venceResolucion
+        },
+        include: {
+          categoria: {
+            include: {
+              politicaSla: true
+            }
+          },
+          cliente: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true
+            }
+          }
+        }
+      });
+
+      response.status(201).json({
+        success: true,
+        message: 'Ticket creado exitosamente',
+        data: {
+          tiquete: nuevoTicket
+        }
+      });
+    } catch (error: any) {
+      console.error('Error al crear ticket:', error);
+      next(error);
+    }
+  };
+
+  // OBTENER PRIORIDADES DISPONIBLES
+  getPrioridades = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const prioridades = [
+        { id: 'BAJA', nombre: 'Baja' },
+        { id: 'MEDIA', nombre: 'Media' },
+        { id: 'ALTA', nombre: 'Alta' },
+        { id: 'CRITICA', nombre: 'Crítica' }
+      ];
+
+      response.json({
+        success: true,
+        data: { prioridades }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // OBTENER ETIQUETAS CON SUS CATEGORÍAS
+  getEtiquetasConCategorias = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const etiquetas = await this.prisma.etiqueta.findMany({
+        include: {
+          categorias: {
+            include: {
+              categoria: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  descripcion: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { nombre: 'asc' }
+      });
+
+      // Formatear respuesta para facilitar uso en frontend
+      const etiquetasFormateadas = etiquetas.map(etiq => ({
+        id: etiq.id,
+        nombre: etiq.nombre,
+        descripcion: etiq.descripcion,
+        categoria: etiq.categorias[0]?.categoria || null
+      }));
+
+      response.json({
+        success: true,
+        data: { etiquetas: etiquetasFormateadas }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // OBTENER INFORMACIÓN DEL USUARIO SOLICITANTE
+  getUsuarioInfo = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const idUsuario = parseInt(request.params.idUsuario);
+      
+      if (isNaN(idUsuario)) {
+        return next(AppError.badRequest("El ID de usuario no es válido"));
+      }
+
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: idUsuario },
+        select: {
+          id: true,
+          nombrecompleto: true,
+          correo: true
+        }
+      });
+
+      if (!usuario) {
+        return next(AppError.notFound('Usuario no encontrado'));
+      }
+
+      response.json({
+        success: true,
+        data: { usuario }
+      });
     } catch (error) {
       next(error);
     }
