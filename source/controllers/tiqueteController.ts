@@ -403,12 +403,13 @@ export class TiqueteController {
   // CREAR NUEVO TICKET
   create = async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const {
+      const { 
         titulo,
         descripcion,
         prioridad,
         idetiqueta, // ID de la etiqueta seleccionada
-        idcliente // ID del usuario solicitante (desde variable en lógica del frontend)
+        idcliente, // ID del usuario solicitante (desde variable en lógica del frontend)
+        imagenes // Array de nombres de archivos subidos
       } = request.body;
 
       // Validaciones
@@ -501,6 +502,42 @@ export class TiqueteController {
               id: true,
               nombrecompleto: true,
               correo: true
+            }
+          }
+        }
+      });
+
+      // Crear historial inicial del ticket
+      // Estado anterior es null (no hay estado previo al crear), estado nuevo es PENDIENTE
+      const historialInicial = await this.prisma.historialTiquete.create({
+        data: {
+          idtiquete: nuevoTicket.id,
+          estadoanterior: EstadoTiquete.ABIERTO, // Estado inicial al crear
+          estadonuevo: EstadoTiquete.PENDIENTE,
+          observacion: 'Ticket creado',
+          cambiadopor: parseInt(idcliente),
+          cambiadoen: fechaCreacion,
+          // Crear las imágenes asociadas al historial si hay
+          imagenes: imagenes && Array.isArray(imagenes) && imagenes.length > 0
+            ? {
+                create: imagenes.map((nombreArchivo: string) => ({
+                  rutaarchivo: nombreArchivo,
+                  subidopor: parseInt(idcliente),
+                  subidoen: fechaCreacion
+                }))
+              }
+            : undefined
+        },
+        include: {
+          imagenes: {
+            include: {
+              usuario: {
+                select: {
+                  id: true,
+                  nombrecompleto: true,
+                  correo: true
+                }
+              }
             }
           }
         }
