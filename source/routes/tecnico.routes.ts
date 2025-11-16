@@ -6,21 +6,15 @@ export class TecnicoRoutes {
     const router = Router();
     const controller = new TecnicoController();
 
-    // Ruta para búsqueda de técnicos - debe ir antes que /:id
-    // GET /api/tecnicos/search?termino=carlos
-    router.get("/search", controller.search);
-    
-    // Ruta para obtener técnicos disponibles
-    // GET /api/tecnicos/disponibles
-    router.get("/disponibles", controller.getDisponibles);
-
-    // Ruta para listado general de técnicos 
-    // GET /api/tecnicos/
+   
     router.get("/", controller.get);
-    
+        // POST /api/tecnicos - Crear nuevo técnico
+    router.post("/", controller.create);
     // Ruta para detalle completo de un técnico por ID
     // GET /api/tecnicos/:id
     router.get("/:id", controller.getById);
+       // PUT /api/tecnicos/:id - Actualizar técnico existente
+    router.put("/:id", controller.update);
 
     return router;
   }

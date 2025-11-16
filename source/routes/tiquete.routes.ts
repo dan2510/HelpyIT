@@ -12,11 +12,14 @@ export class TiqueteRoutes {
     // GET /api/tiquetes/
     router.get("/", controller.get);
     
-
+  // POST /api/tiquetes - Crear nuevo tiquete
+    router.post("/", controller.create);
 
     // Ruta para detalle completo de un tiquete por ID
     // GET /api/tiquetes/:id
     router.get("/:id", controller.getById);
+    
+   //  router.post("/:id/assign", controller.assignTecnico);
 
     return router;
   }

@@ -4,6 +4,7 @@ import { CategoriaRoutes } from "./categoria.routes";
 import { TiqueteRoutes } from "./tiquete.routes";
 import { AsignacionRoutes } from "./asignacion.routes"; 
 import { ImageRoutes } from "./image.routes";
+import { EspecialidadRoutes } from "./especialidad.routes";
 
 export class AppRoutes {
   static get routes(): Router {
@@ -12,8 +13,9 @@ export class AppRoutes {
     router.use("/tecnicos", TecnicoRoutes.routes);
     router.use("/categorias", CategoriaRoutes.routes);
     router.use("/tiquetes", TiqueteRoutes.routes);
-      router.use("/asignaciones", AsignacionRoutes.routes);
-        router.use("/file/", ImageRoutes.routes);
+    router.use("/asignaciones", AsignacionRoutes.routes);
+    router.use("/file/", ImageRoutes.routes);
+    router.use("/especialidad", EspecialidadRoutes.routes);
 
     return router;
   }
