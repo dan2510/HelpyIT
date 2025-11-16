@@ -76,7 +76,7 @@ const main = async () => {
         rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.DISPONIBLE,
-        cargaactual: 3,
+        cargaactual: 5, // 5 tickets activos: Ticket 1 (ABIERTO), 6 (PENDIENTE), 7 (ASIGNADO), 8 (EN_PROGRESO), 9 (ABIERTO)
         maxticketsimultaneos: 6,
         especialidades: {
           create: [
@@ -107,7 +107,7 @@ const main = async () => {
         rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.DISPONIBLE,
-        cargaactual: 2,
+        cargaactual: 1, // 1 ticket activo: Ticket 2 (EN_PROGRESO)
         maxticketsimultaneos: 4,
         especialidades: {
           create: [
@@ -189,7 +189,7 @@ const main = async () => {
         rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.OCUPADO,
-        cargaactual: 4,
+        cargaactual: 1, // 1 ticket activo: Ticket 4 (ASIGNADO)
         maxticketsimultaneos: 7,
         especialidades: {
           create: [

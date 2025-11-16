@@ -6,13 +6,18 @@ export class TiqueteRoutes {
     const router = Router();
     const controller = new TiqueteController();
 
-         router.get("/usuario/:idUsuario", controller.getTiquetesPorUsuario);
+    // Rutas auxiliares (deben ir antes de las rutas con parámetros)
+    router.get("/prioridades", controller.getPrioridades);
+    router.get("/etiquetas", controller.getEtiquetasConCategorias);
+    router.get("/usuario/:idUsuario/info", controller.getUsuarioInfo);
+    
+    router.get("/usuario/:idUsuario", controller.getTiquetesPorUsuario);
 
     // Ruta para listado general de tiquetes (admin)
     // GET /api/tiquetes/
     router.get("/", controller.get);
     
-  // POST /api/tiquetes - Crear nuevo tiquete
+    // POST /api/tiquetes - Crear nuevo tiquete
     router.post("/", controller.create);
 
     // Ruta para detalle completo de un tiquete por ID
