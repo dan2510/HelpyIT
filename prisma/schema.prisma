@@ -296,6 +296,7 @@ enum Disponibilidad {
   DISPONIBLE
   OCUPADO
   AUSENTE
+  INACTIVO
 }
 
 enum Prioridad {

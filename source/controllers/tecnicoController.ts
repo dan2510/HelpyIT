@@ -265,15 +265,24 @@ export class TecnicoController {
         return next(AppError.notFound("Técnico no encontrado"));
       }
 
+      // Si se marca como inactivo, asegurar que la disponibilidad sea INACTIVO
+      let disponibilidadFinal = disponibilidad ? (disponibilidad as Disponibilidad) : tecnicoExistente.disponibilidad;
+      const activoFinal = activo !== undefined ? activo : tecnicoExistente.activo;
+      
+      // Si se marca como inactivo, cambiar disponibilidad a INACTIVO automáticamente
+      if (activoFinal === false) {
+        disponibilidadFinal = Disponibilidad.INACTIVO;
+      }
+
       // Actualizar el técnico
       const tecnicoActualizado = await this.prisma.usuario.update({
         where: { id: idTecnico },
         data: {
           nombrecompleto: nombrecompleto ? nombrecompleto.trim() : tecnicoExistente.nombrecompleto,
           telefono: telefono !== undefined ? (telefono?.trim() || null) : tecnicoExistente.telefono,
-          disponibilidad: disponibilidad ? (disponibilidad as Disponibilidad) : tecnicoExistente.disponibilidad,
+          disponibilidad: disponibilidadFinal,
           maxticketsimultaneos: maxticketsimultaneos || tecnicoExistente.maxticketsimultaneos,
-          activo: activo !== undefined ? activo : tecnicoExistente.activo,
+          activo: activoFinal,
           actualizadoen: new Date(),
           // NO se actualiza cargaactual - se mantiene el valor actual
         },
