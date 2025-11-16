@@ -7,20 +7,21 @@ export class TecnicoController {
   prisma = new PrismaClient();
 
   // Listado de técnicos - máximo 3 campos según requerimiento
-  get = async (request: Request, response: Response, next: NextFunction) => {
+  get = async (_request: Request, response: Response, next: NextFunction) => {
     try {
       const listadoTecnicos = await this.prisma.usuario.findMany({
         where: {
           rol: {
             nombre: RoleNombre.TECNICO
-          },
-          activo: true
+          }
+          // Se muestran todos los técnicos (activos e inactivos) para poder modificarlos
         },
         select: {
           id: true,
           nombrecompleto: true,
           disponibilidad: true,
-          cargaactual: true
+          cargaactual: true,
+          activo: true
         },
         orderBy: {
           nombrecompleto: "asc"
@@ -58,8 +59,8 @@ export class TecnicoController {
           id: idTecnico,
           rol: {
             nombre: RoleNombre.TECNICO
-          },
-          activo: true
+          }
+          // Se permite obtener técnicos inactivos también
         },
         include: {
           rol: {
@@ -155,9 +156,15 @@ export class TecnicoController {
         return next(AppError.badRequest("Faltan campos obligatorios"));
       }
 
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(correo.trim())) {
+        return next(AppError.badRequest("El formato del correo electrónico no es válido"));
+      }
+
       // Verificar si el email ya existe
       const usuarioExistente = await this.prisma.usuario.findUnique({
-        where: { correo }
+        where: { correo: correo.trim() }
       });
 
       if (usuarioExistente) {
