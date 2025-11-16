@@ -417,6 +417,21 @@ export class CategoriaController {
         });
       }
 
+      if (!especialidades || !Array.isArray(especialidades) || especialidades.length === 0) {
+        validationErrors.push({
+          fields: ['especialidades'],
+          constraint: 'Debe seleccionar al menos una especialidad'
+        });
+      }
+
+      // Validar SLA: o se selecciona uno existente o se establecen ambos tiempos
+      if (!idsla && (!maxminutosrespuesta || !maxminutosresolucion)) {
+        validationErrors.push({
+          fields: ['sla'],
+          constraint: 'Debe seleccionar un SLA o establecer tiempos manualmente'
+        });
+      }
+
       if (maxminutosrespuesta !== undefined && maxminutosrespuesta <= 0) {
         validationErrors.push({
           fields: ['maxminutosrespuesta'],

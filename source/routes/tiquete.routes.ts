@@ -9,6 +9,7 @@ export class TiqueteRoutes {
     // Rutas auxiliares (deben ir antes de las rutas con parámetros)
     router.get("/prioridades", controller.getPrioridades);
     router.get("/etiquetas", controller.getEtiquetasConCategorias);
+    router.get("/clientes", controller.getClientes);
     router.get("/usuario/:idUsuario/info", controller.getUsuarioInfo);
     
     router.get("/usuario/:idUsuario", controller.getTiquetesPorUsuario);

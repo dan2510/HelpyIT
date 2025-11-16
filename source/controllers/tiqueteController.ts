@@ -605,4 +605,33 @@ export class TiqueteController {
       next(error);
     }
   };
+
+  // OBTENER TODOS LOS CLIENTES
+  getClientes = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const clientes = await this.prisma.usuario.findMany({
+        where: {
+          rol: {
+            nombre: RoleNombre.CLIENTE
+          },
+          activo: true
+        },
+        select: {
+          id: true,
+          nombrecompleto: true,
+          correo: true
+        },
+        orderBy: {
+          nombrecompleto: 'asc'
+        }
+      });
+
+      response.json({
+        success: true,
+        data: { clientes }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
