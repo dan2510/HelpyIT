@@ -1,0 +1,12 @@
+2025-11-19 15:00:38.870 error: 	Daniel Carballo--Usuario no encontrado Usuario no encontrado
+2025-11-19 15:02:15.569 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `this.prisma.usuario.update()` invocation in
+C:\appHelpyIT\server\source\controllers\tecnicoController.ts:96:33
+
+  93 });
+  94 
+  95 // Actualizar cargaactual en la base de datos
+→ 96 await this.prisma.usuario.update(
+An operation failed because it depends on one or more records that were required but not found. No record was found for an update.
+2025-11-19 15:04:47.703 error: 	Daniel Carballo--Técnico no encontrado Técnico no encontrado
+2025-11-19 15:04:48.600 error: 	Daniel Carballo--Técnico no encontrado Técnico no encontrado
