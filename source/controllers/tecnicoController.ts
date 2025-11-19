@@ -9,7 +9,8 @@ export class TecnicoController {
   // Listado de técnicos - máximo 3 campos según requerimiento
   get = async (_request: Request, response: Response, next: NextFunction) => {
     try {
-      const listadoTecnicos = await this.prisma.usuario.findMany({
+      // Obtener todos los técnicos
+      const tecnicos = await this.prisma.usuario.findMany({
         where: {
           rol: {
             nombre: RoleNombre.TECNICO
@@ -28,13 +29,40 @@ export class TecnicoController {
         }
       });
 
+      // Recalcular cargaactual para cada técnico
+      const tecnicosConCargaActualizada = await Promise.all(
+        tecnicos.map(async (tecnico) => {
+          const ticketsActivosCount = await this.prisma.tiquete.count({
+            where: {
+              idtecnicoactual: tecnico.id,
+              estado: {
+                notIn: [EstadoTiquete.RESUELTO, EstadoTiquete.CERRADO]
+              }
+            }
+          });
+
+          // Actualizar cargaactual en la base de datos si es diferente
+          if (tecnico.cargaactual !== ticketsActivosCount) {
+            await this.prisma.usuario.update({
+              where: { id: tecnico.id },
+              data: { cargaactual: ticketsActivosCount }
+            });
+          }
+
+          return {
+            ...tecnico,
+            cargaactual: ticketsActivosCount
+          };
+        })
+      );
+
       const responseData = {
         success: true,
         data: {
-          tecnicos: listadoTecnicos,
-          total: listadoTecnicos.length,
+          tecnicos: tecnicosConCargaActualizada,
+          total: tecnicosConCargaActualizada.length,
           page: 1,
-          limit: listadoTecnicos.length,
+          limit: tecnicosConCargaActualizada.length,
           totalPages: 1
         }
       };
@@ -53,6 +81,22 @@ export class TecnicoController {
       if (isNaN(idTecnico)) {
         return next(AppError.badRequest("El ID no es válido"));
       }
+
+      // Recalcular cargaactual antes de obtener el técnico
+      const ticketsActivosCount = await this.prisma.tiquete.count({
+        where: {
+          idtecnicoactual: idTecnico,
+          estado: {
+            notIn: [EstadoTiquete.RESUELTO, EstadoTiquete.CERRADO]
+          }
+        }
+      });
+
+      // Actualizar cargaactual en la base de datos
+      await this.prisma.usuario.update({
+        where: { id: idTecnico },
+        data: { cargaactual: ticketsActivosCount }
+      });
 
       const tecnico = await this.prisma.usuario.findFirst({
         where: {
@@ -84,7 +128,7 @@ export class TecnicoController {
           tiquetesComoTecnico: {
             where: {
               estado: {
-                in: [EstadoTiquete.ABIERTO, EstadoTiquete.EN_PROGRESO, EstadoTiquete.ASIGNADO, EstadoTiquete.PENDIENTE]
+                notIn: [EstadoTiquete.RESUELTO, EstadoTiquete.CERRADO]
               }
             },
             select: {
@@ -92,6 +136,9 @@ export class TecnicoController {
               titulo: true,
               estado: true,
               prioridad: true
+            },
+            orderBy: {
+              id: 'asc'
             }
           }
         }
@@ -112,7 +159,7 @@ export class TecnicoController {
         creadoen: tecnico.creadoen,
         actualizadoen: tecnico.actualizadoen,
         disponibilidad: tecnico.disponibilidad,
-        cargaactual: tecnico.cargaactual,
+        cargaactual: ticketsActivosCount, // Usar el valor recalculado
         maxticketsimultaneos: tecnico.maxticketsimultaneos,
         rol: tecnico.rol,
         especialidades: tecnico.especialidades.map(esp => ({

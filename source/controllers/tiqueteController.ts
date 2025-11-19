@@ -671,4 +671,385 @@ export class TiqueteController {
       next(error);
     }
   };
+
+  // ACTUALIZAR TICKET
+  update = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const idTiquete = parseInt(request.params.id);
+      
+      if (isNaN(idTiquete)) {
+        return next(AppError.badRequest("El ID no es válido"));
+      }
+
+      const { idtecnicoactual, idUsuarioCambio } = request.body;
+
+      // Verificar que el ticket existe
+      const tiqueteExistente = await this.prisma.tiquete.findUnique({
+        where: { id: idTiquete }
+      });
+
+      if (!tiqueteExistente) {
+        return next(AppError.notFound("Ticket no encontrado"));
+      }
+
+      // Si se proporciona un técnico, verificar que existe y es técnico
+      let tecnicoAsignado = null;
+      if (idtecnicoactual !== undefined && idtecnicoactual !== null) {
+        tecnicoAsignado = await this.prisma.usuario.findFirst({
+          where: {
+            id: parseInt(idtecnicoactual),
+            rol: {
+              nombre: RoleNombre.TECNICO
+            }
+          }
+        });
+
+        if (!tecnicoAsignado) {
+          return next(AppError.badRequest("El técnico especificado no existe o no es válido"));
+        }
+      }
+
+      // Determinar el nuevo estado
+      // Si se asigna un técnico y el estado es PENDIENTE, cambiar a ASIGNADO
+      let nuevoEstado = tiqueteExistente.estado;
+      const estadoAnterior = tiqueteExistente.estado;
+      
+      if (idtecnicoactual !== undefined && idtecnicoactual !== null && 
+          tiqueteExistente.idtecnicoactual === null &&
+          tiqueteExistente.estado === EstadoTiquete.PENDIENTE) {
+        nuevoEstado = EstadoTiquete.ASIGNADO;
+      } else if (idtecnicoactual === null && tiqueteExistente.idtecnicoactual !== null) {
+        // Si se desasigna el técnico y estaba asignado, volver a PENDIENTE
+        nuevoEstado = EstadoTiquete.PENDIENTE;
+      }
+
+      // Actualizar el ticket
+      const tiqueteActualizado = await this.prisma.tiquete.update({
+        where: { id: idTiquete },
+        data: {
+          idtecnicoactual: idtecnicoactual !== undefined && idtecnicoactual !== null 
+            ? parseInt(idtecnicoactual) 
+            : null,
+          estado: nuevoEstado
+        },
+        include: {
+          categoria: {
+            include: {
+              politicaSla: {
+                select: {
+                  nombre: true,
+                  descripcion: true,
+                  maxminutosrespuesta: true,
+                  maxminutosresolucion: true
+                }
+              }
+            }
+          },
+          cliente: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          },
+          tecnicoActual: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          },
+          historiales: {
+            include: {
+              usuarioCambio: {
+                select: {
+                  id: true,
+                  nombrecompleto: true,
+                  correo: true,
+                  telefono: true
+                }
+              },
+              imagenes: {
+                include: {
+                  usuario: {
+                    select: {
+                      id: true,
+                      nombrecompleto: true,
+                      correo: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: {
+              cambiadoen: 'desc'
+            }
+          },
+          valoraciones: {
+            include: {
+              cliente: {
+                select: {
+                  id: true,
+                  nombrecompleto: true,
+                  correo: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Actualizar cargaactual de los técnicos afectados
+      const tecnicoAnteriorId = tiqueteExistente.idtecnicoactual;
+      const tecnicoNuevoId = idtecnicoactual !== undefined && idtecnicoactual !== null 
+        ? parseInt(idtecnicoactual) 
+        : null;
+
+      // Función para recalcular cargaactual de un técnico
+      const recalcularCargaActual = async (idTecnico: number | null) => {
+        if (!idTecnico) return;
+        
+        const ticketsActivos = await this.prisma.tiquete.count({
+          where: {
+            idtecnicoactual: idTecnico,
+            estado: {
+              notIn: [EstadoTiquete.RESUELTO, EstadoTiquete.CERRADO]
+            }
+          }
+        });
+
+        await this.prisma.usuario.update({
+          where: { id: idTecnico },
+          data: { cargaactual: ticketsActivos }
+        });
+      };
+
+      // Recalcular cargaactual del técnico anterior (si había uno y cambió)
+      if (tecnicoAnteriorId && tecnicoAnteriorId !== tecnicoNuevoId) {
+        await recalcularCargaActual(tecnicoAnteriorId);
+      }
+
+      // Recalcular cargaactual del técnico nuevo (si hay uno y es diferente al anterior)
+      if (tecnicoNuevoId && tecnicoNuevoId !== tecnicoAnteriorId) {
+        await recalcularCargaActual(tecnicoNuevoId);
+      }
+
+      // Crear registro en el historial si hubo cambio de estado o asignación de técnico
+      let historialCreado = false;
+      if (estadoAnterior !== nuevoEstado || 
+          (idtecnicoactual !== undefined && tiqueteExistente.idtecnicoactual !== parseInt(idtecnicoactual))) {
+        
+        const usuarioCambioId = idUsuarioCambio || tiqueteExistente.idcliente; // Usar el usuario que hace el cambio o el cliente por defecto
+        
+        let observacion = '';
+        if (estadoAnterior !== nuevoEstado) {
+          observacion = `Estado cambiado de ${estadoAnterior} a ${nuevoEstado}`;
+        }
+        
+        if (idtecnicoactual !== undefined && tiqueteExistente.idtecnicoactual !== parseInt(idtecnicoactual)) {
+          if (idtecnicoactual !== null) {
+            observacion += observacion ? `. Técnico asignado: ${tecnicoAsignado?.nombrecompleto}` 
+                                      : `Técnico asignado: ${tecnicoAsignado?.nombrecompleto}`;
+          } else {
+            observacion += observacion ? '. Técnico desasignado' : 'Técnico desasignado';
+          }
+        }
+
+        await this.prisma.historialTiquete.create({
+          data: {
+            idtiquete: idTiquete,
+            estadoanterior: estadoAnterior,
+            estadonuevo: nuevoEstado,
+            observacion: observacion || 'Técnico asignado',
+            cambiadopor: parseInt(usuarioCambioId.toString())
+          }
+        });
+        historialCreado = true;
+      }
+
+      // Si se creó un historial, recargar el ticket con el historial actualizado
+      if (historialCreado) {
+        const tiqueteConHistorial = await this.prisma.tiquete.findFirst({
+          where: { id: idTiquete },
+          include: {
+            categoria: {
+              include: {
+                politicaSla: {
+                  select: {
+                    nombre: true,
+                    descripcion: true,
+                    maxminutosrespuesta: true,
+                    maxminutosresolucion: true
+                  }
+                }
+              }
+            },
+            cliente: {
+              select: {
+                id: true,
+                nombrecompleto: true,
+                correo: true,
+                telefono: true
+              }
+            },
+            tecnicoActual: {
+              select: {
+                id: true,
+                nombrecompleto: true,
+                correo: true,
+                telefono: true
+              }
+            },
+            historiales: {
+              include: {
+                usuarioCambio: {
+                  select: {
+                    id: true,
+                    nombrecompleto: true,
+                    correo: true,
+                    telefono: true
+                  }
+                },
+                imagenes: {
+                  include: {
+                    usuario: {
+                      select: {
+                        id: true,
+                        nombrecompleto: true,
+                        correo: true
+                      }
+                    }
+                  }
+                }
+              },
+              orderBy: {
+                cambiadoen: 'desc'
+              }
+            },
+            valoraciones: {
+              include: {
+                cliente: {
+                  select: {
+                    id: true,
+                    nombrecompleto: true,
+                    correo: true
+                  }
+                }
+              }
+            }
+          }
+        });
+        
+        if (tiqueteConHistorial) {
+          tiqueteActualizado.historiales = tiqueteConHistorial.historiales;
+        }
+      }
+
+      // Recalcular cumplimiento de SLA (similar a getById)
+      let diasResolucion = null;
+      if (tiqueteActualizado.resueltoen) {
+        const diffTime = Math.abs(new Date(tiqueteActualizado.resueltoen).getTime() - new Date(tiqueteActualizado.creadoen).getTime());
+        diasResolucion = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      let horasRespuesta = null;
+      if (tiqueteActualizado.primerarespuestaen) {
+        const diffTime = Math.abs(new Date(tiqueteActualizado.primerarespuestaen).getTime() - new Date(tiqueteActualizado.creadoen).getTime());
+        horasRespuesta = Math.round(diffTime / (1000 * 60 * 60) * 10) / 10;
+      }
+
+      let horasResolucion = null;
+      if (tiqueteActualizado.resueltoen) {
+        const diffTime = Math.abs(new Date(tiqueteActualizado.resueltoen).getTime() - new Date(tiqueteActualizado.creadoen).getTime());
+        horasResolucion = Math.round(diffTime / (1000 * 60 * 60) * 10) / 10;
+      }
+
+      // Formatear historial (similar a getById)
+      const historiales = tiqueteActualizado.historiales.map(hist => ({
+        id: hist.id,
+        estadoanterior: hist.estadoanterior,
+        estadonuevo: hist.estadonuevo,
+        observacion: hist.observacion,
+        cambiadoen: hist.cambiadoen,
+        cambiadopor: hist.usuarioCambio,
+        imagenes: hist.imagenes.map(img => ({
+          id: img.id,
+          rutaarchivo: img.rutaarchivo,
+          subidoen: img.subidoen,
+          subidopor: img.usuario
+        }))
+      }));
+
+      // Formatear valoraciones (similar a getById)
+      const valoraciones = tiqueteActualizado.valoraciones.map(val => ({
+        id: val.id,
+        calificacion: val.calificacion,
+        comentario: val.comentario,
+        creadaen: val.creadaen,
+        cliente: val.cliente
+      }));
+
+      // Formatear respuesta igual que getById
+      const tiqueteDetail = {
+        // Información básica
+        id: tiqueteActualizado.id,
+        titulo: tiqueteActualizado.titulo,
+        descripcion: tiqueteActualizado.descripcion,
+        prioridad: tiqueteActualizado.prioridad,
+        estado: tiqueteActualizado.estado,
+        
+        // Fechas
+        creadoen: tiqueteActualizado.creadoen,
+        primerarespuestaen: tiqueteActualizado.primerarespuestaen,
+        resueltoen: tiqueteActualizado.resueltoen,
+        cerradoen: tiqueteActualizado.cerradoen,
+        vencerespuesta: tiqueteActualizado.vencerespuesta,
+        venceresolucion: tiqueteActualizado.venceresolucion,
+        
+        // Relaciones
+        categoria: {
+          id: tiqueteActualizado.categoria.id,
+          nombre: tiqueteActualizado.categoria.nombre,
+          descripcion: tiqueteActualizado.categoria.descripcion
+        },
+        cliente: tiqueteActualizado.cliente,
+        tecnicoActual: tiqueteActualizado.tecnicoActual || null,
+        
+        // SLA
+        sla: {
+          nombre: tiqueteActualizado.categoria.politicaSla.nombre,
+          descripcion: tiqueteActualizado.categoria.politicaSla.descripcion,
+          maxminutosrespuesta: tiqueteActualizado.categoria.politicaSla.maxminutosrespuesta,
+          maxminutosresolucion: tiqueteActualizado.categoria.politicaSla.maxminutosresolucion,
+          tiempoRespuestaHoras: Math.round(tiqueteActualizado.categoria.politicaSla.maxminutosrespuesta / 60 * 10) / 10,
+          tiempoResolucionHoras: Math.round(tiqueteActualizado.categoria.politicaSla.maxminutosresolucion / 60 * 10) / 10
+        },
+        
+        // Cumplimiento SLA calculado
+        cumplimiento: {
+          cumplioslarespuesta: tiqueteActualizado.cumplioslarespuesta,
+          cumplioslaresolucion: tiqueteActualizado.cumplioslaresolucion,
+          diasResolucion: diasResolucion,
+          horasRespuesta: horasRespuesta,
+          horasResolucion: horasResolucion
+        },
+        
+        // Historial y valoraciones
+        historiales: historiales,
+        valoraciones: valoraciones
+      };
+
+      response.json({
+        success: true,
+        message: 'Ticket actualizado exitosamente',
+        data: {
+          tiquete: tiqueteDetail
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

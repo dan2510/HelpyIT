@@ -25,7 +25,8 @@ export class TiqueteRoutes {
     // GET /api/tiquetes/:id
     router.get("/:id", controller.getById);
     
-   //  router.post("/:id/assign", controller.assignTecnico);
+    // PUT /api/tiquetes/:id - Actualizar ticket
+    router.put("/:id", controller.update);
 
     return router;
   }
