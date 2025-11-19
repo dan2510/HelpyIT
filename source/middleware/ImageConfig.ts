@@ -30,7 +30,7 @@ const storage: StorageEngine = multer.diskStorage({
     }
 
     // Generar el nombre del nuevo archivo
-    cb(null,'videojuego_' + Date.now() 
+    cb(null,'Evidencia_' + Date.now() 
           + path.extname(file.originalname))
   },
 });
