@@ -5,6 +5,8 @@ import { TiqueteRoutes } from "./tiquete.routes";
 import { AsignacionRoutes } from "./asignacion.routes"; 
 import { ImageRoutes } from "./image.routes";
 import { EspecialidadRoutes } from "./especialidad.routes";
+import { EtiquetaRoutes } from "./etiqueta.routes";
+import { PoliticaSlaRoutes } from "./politicaSla.routes";
 
 export class AppRoutes {
   static get routes(): Router {
@@ -16,6 +18,8 @@ export class AppRoutes {
     router.use("/asignaciones", AsignacionRoutes.routes);
     router.use("/file/", ImageRoutes.routes);
     router.use("/especialidad", EspecialidadRoutes.routes);
+    router.use("/etiqueta", EtiquetaRoutes.routes);
+    router.use("/politica-sla", PoliticaSlaRoutes.routes);
 
     return router;
   }

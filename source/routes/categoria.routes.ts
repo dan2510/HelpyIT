@@ -6,11 +6,6 @@ export class CategoriaRoutes {
     const router = Router();
     const controller = new CategoriaController();
 
-    // Rutas auxiliares (deben ir antes de las rutas con parámetros)
-    router.get("/etiquetas", controller.getEtiquetas);
-    router.get("/especialidades", controller.getEspecialidades);
-    router.get("/slas", controller.getSLAs);
-    
     // Ruta para búsqueda de categorías - debe ir antes que /:id
     // GET /api/categorias/search?q=software
     router.get("/search", controller.search);
