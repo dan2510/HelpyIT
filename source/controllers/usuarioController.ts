@@ -165,28 +165,27 @@ export class UsuarioController {
   };
 
   // OBTENER PERFIL DEL USUARIO AUTENTICADO
-  userAuth = async (req: Request, res: Response, next: NextFunction) => {
+  userAuth = (req: Request, res: Response, next: NextFunction) => {
     try {
       const usuario = req.user as any;
       
-      // Obtener usuario completo con relaciones (solo include, no select)
-      const user = await this.prisma.usuario.findUnique({
+      // Obtener usuario completo con relaciones
+      this.prisma.usuario.findUnique({
         where: { id: usuario.id },
         include: {
           rol: true
         }
+      }).then(user => {
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "Usuario no encontrado"
+          });
+        }
+        res.json(user);
+      }).catch(error => {
+        next(error);
       });
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "Usuario no encontrado"
-        });
-      }
-
-      // Eliminar la contraseña del objeto de respuesta
-      const { contrasenahash, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
     } catch (error) {
       next(error);
     }
