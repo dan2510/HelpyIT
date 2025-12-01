@@ -553,7 +553,7 @@ export class TiqueteController {
         data: {
           idtiquete: nuevoTicket.id,
           tipo: TipoHistorial.CAMBIO_ESTADO,
-          estadoanterior: EstadoTiquete.PENDIENTE, // Estado inicial al crear
+          estadoanterior: null, // No hay estado previo al crear el ticket
           estadonuevo: EstadoTiquete.PENDIENTE,
           observacion: 'Ticket creado',
           cambiadopor: idcliente,
@@ -1255,24 +1255,9 @@ export class TiqueteController {
         }
       });
 
-      // Si la observación es EXTERNAL, crear un comentario external automáticamente
-      // (El SLA ya se actualizó antes de actualizar el ticket)
-      // Nota: Este comentario se crea después del cambio de estado, así que usa el nuevo estado
-      if (tipoObs === 'EXTERNAL') {
-        // Crear comentario external con la misma observación
-        // Establecer el nuevo estado en ambos campos para indicar que se mantiene después del cambio
-        await this.prisma.historialTiquete.create({
-          data: {
-            idtiquete: idTiquete,
-            tipo: TipoHistorial.COMENTARIO_EXTERNAL,
-            observacion: observacion.trim(),
-            estadoanterior: nuevoEstadoEnum,
-            estadonuevo: nuevoEstadoEnum,
-            cambiadopor: usuarioAutenticado.id,
-            cambiadoen: ahora
-          }
-        });
-      }
+      // NOTA: No se crea un comentario EXTERNAL adicional cuando se cambia el estado
+      // El historial de cambio de estado ya contiene la observación
+      // Si se necesita un comentario EXTERNAL separado, debe agregarse después usando el endpoint de comentarios
 
       // Obtener el ticket completo con historial actualizado
       const tiqueteCompleto = await this.prisma.tiquete.findFirst({
