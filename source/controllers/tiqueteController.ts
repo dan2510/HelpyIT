@@ -996,4 +996,358 @@ export class TiqueteController {
       next(error);
     }
   };
+
+  // ACTUALIZAR ESTADO DEL TICKET CON VALIDACIONES ESTRICTAS
+  // Este método implementa el flujo estricto: Pendiente → Asignado → En Proceso → Resuelto → Cerrado
+  updateEstado = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const idTiquete = parseInt(request.params.id);
+      
+      if (isNaN(idTiquete)) {
+        return next(AppError.badRequest("El ID no es válido"));
+      }
+
+      // Obtener usuario autenticado
+      const usuarioAutenticado = request.user as any;
+      if (!usuarioAutenticado || !usuarioAutenticado.id) {
+        return next(AppError.unauthorized("Usuario no autenticado"));
+      }
+
+      const { nuevoEstado, observacion, imagenes } = request.body;
+
+      // Validar que se proporcionó un nuevo estado
+      if (!nuevoEstado) {
+        return next(AppError.badRequest("El nuevo estado es obligatorio"));
+      }
+
+      // Validar que el nuevo estado es válido
+      const estadosValidos = Object.values(EstadoTiquete);
+      if (!estadosValidos.includes(nuevoEstado as EstadoTiquete)) {
+        return next(AppError.badRequest(`Estado inválido. Estados válidos: ${estadosValidos.join(', ')}`));
+      }
+
+      // Validar que se proporcionó una observación
+      if (!observacion || observacion.trim().length === 0) {
+        return next(AppError.badRequest("La observación es obligatoria para cambiar el estado"));
+      }
+
+      // Validar que se proporcionó al menos una imagen
+      if (!imagenes || !Array.isArray(imagenes) || imagenes.length === 0) {
+        return next(AppError.badRequest("Se requiere al menos una imagen como evidencia"));
+      }
+
+      // Obtener el ticket actual
+      const tiqueteExistente = await this.prisma.tiquete.findUnique({
+        where: { id: idTiquete },
+        include: {
+          tecnicoActual: {
+            select: {
+              id: true,
+              nombrecompleto: true
+            }
+          }
+        }
+      });
+
+      if (!tiqueteExistente) {
+        return next(AppError.notFound("Ticket no encontrado"));
+      }
+
+      const estadoAnterior = tiqueteExistente.estado;
+      const nuevoEstadoEnum = nuevoEstado as EstadoTiquete;
+
+      // Validar que no se intente cambiar al mismo estado
+      if (estadoAnterior === nuevoEstadoEnum) {
+        return next(AppError.badRequest("El ticket ya se encuentra en ese estado"));
+      }
+
+      // Definir el flujo válido de estados
+      const flujoValido: { [key in EstadoTiquete]?: EstadoTiquete[] } = {
+        [EstadoTiquete.PENDIENTE]: [EstadoTiquete.ASIGNADO],
+        [EstadoTiquete.ASIGNADO]: [EstadoTiquete.EN_PROGRESO],
+        [EstadoTiquete.EN_PROGRESO]: [EstadoTiquete.RESUELTO],
+        [EstadoTiquete.RESUELTO]: [EstadoTiquete.CERRADO]
+      };
+
+      // Validar que la transición sigue el flujo válido
+      const estadosPermitidos = flujoValido[estadoAnterior];
+      if (!estadosPermitidos || !estadosPermitidos.includes(nuevoEstadoEnum)) {
+        return next(AppError.badRequest(
+          `No se puede cambiar de ${estadoAnterior} a ${nuevoEstadoEnum}. ` +
+          `Transiciones válidas desde ${estadoAnterior}: ${estadosPermitidos?.join(', ') || 'ninguna'}`
+        ));
+      }
+
+      // Validar que no se puede avanzar sin técnico asignado (excepto desde Pendiente)
+      if (estadoAnterior !== EstadoTiquete.PENDIENTE && !tiqueteExistente.idtecnicoactual) {
+        return next(AppError.badRequest(
+          "No se puede avanzar el estado sin un técnico asignado. " +
+          "Solo se puede avanzar desde 'Pendiente' sin técnico asignado."
+        ));
+      }
+
+      // Preparar datos de actualización
+      const updateData: any = {
+        estado: nuevoEstadoEnum
+      };
+
+      // Actualizar fechas según el nuevo estado
+      const ahora = new Date();
+      if (nuevoEstadoEnum === EstadoTiquete.ASIGNADO && !tiqueteExistente.primerarespuestaen) {
+        updateData.primerarespuestaen = ahora;
+      }
+      if (nuevoEstadoEnum === EstadoTiquete.RESUELTO && !tiqueteExistente.resueltoen) {
+        updateData.resueltoen = ahora;
+      }
+      if (nuevoEstadoEnum === EstadoTiquete.CERRADO && !tiqueteExistente.cerradoen) {
+        updateData.cerradoen = ahora;
+      }
+
+      // Actualizar el ticket
+      const tiqueteActualizado = await this.prisma.tiquete.update({
+        where: { id: idTiquete },
+        data: updateData,
+        include: {
+          categoria: {
+            include: {
+              politicaSla: {
+                select: {
+                  nombre: true,
+                  descripcion: true,
+                  maxminutosrespuesta: true,
+                  maxminutosresolucion: true
+                }
+              }
+            }
+          },
+          cliente: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          },
+          tecnicoActual: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          }
+        }
+      });
+
+      // Crear registro en el historial
+      const historialCreado = await this.prisma.historialTiquete.create({
+        data: {
+          idtiquete: idTiquete,
+          estadoanterior: estadoAnterior,
+          estadonuevo: nuevoEstadoEnum,
+          observacion: observacion.trim(),
+          cambiadopor: usuarioAutenticado.id,
+          cambiadoen: ahora,
+          imagenes: {
+            create: imagenes.map((nombreArchivo: string) => ({
+              rutaarchivo: nombreArchivo,
+              subidopor: usuarioAutenticado.id,
+              subidoen: ahora
+            }))
+          }
+        },
+        include: {
+          usuarioCambio: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          },
+          imagenes: {
+            include: {
+              usuario: {
+                select: {
+                  id: true,
+                  nombrecompleto: true,
+                  correo: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Obtener el ticket completo con historial actualizado
+      const tiqueteCompleto = await this.prisma.tiquete.findFirst({
+        where: { id: idTiquete },
+        include: {
+          categoria: {
+            include: {
+              politicaSla: {
+                select: {
+                  nombre: true,
+                  descripcion: true,
+                  maxminutosrespuesta: true,
+                  maxminutosresolucion: true
+                }
+              }
+            }
+          },
+          cliente: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          },
+          tecnicoActual: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          },
+          historiales: {
+            include: {
+              usuarioCambio: {
+                select: {
+                  id: true,
+                  nombrecompleto: true,
+                  correo: true,
+                  telefono: true
+                }
+              },
+              imagenes: {
+                include: {
+                  usuario: {
+                    select: {
+                      id: true,
+                      nombrecompleto: true,
+                      correo: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: {
+              cambiadoen: 'desc'
+            }
+          },
+          valoraciones: {
+            include: {
+              cliente: {
+                select: {
+                  id: true,
+                  nombrecompleto: true,
+                  correo: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!tiqueteCompleto) {
+        return next(AppError.internalServer("Error al obtener el ticket actualizado"));
+      }
+
+      // Calcular cumplimiento de SLA
+      let diasResolucion = null;
+      if (tiqueteCompleto.resueltoen) {
+        const diffTime = Math.abs(new Date(tiqueteCompleto.resueltoen).getTime() - new Date(tiqueteCompleto.creadoen).getTime());
+        diasResolucion = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      let horasRespuesta = null;
+      if (tiqueteCompleto.primerarespuestaen) {
+        const diffTime = Math.abs(new Date(tiqueteCompleto.primerarespuestaen).getTime() - new Date(tiqueteCompleto.creadoen).getTime());
+        horasRespuesta = Math.round(diffTime / (1000 * 60 * 60) * 10) / 10;
+      }
+
+      let horasResolucion = null;
+      if (tiqueteCompleto.resueltoen) {
+        const diffTime = Math.abs(new Date(tiqueteCompleto.resueltoen).getTime() - new Date(tiqueteCompleto.creadoen).getTime());
+        horasResolucion = Math.round(diffTime / (1000 * 60 * 60) * 10) / 10;
+      }
+
+      // Formatear historial
+      const historiales = tiqueteCompleto.historiales.map(hist => ({
+        id: hist.id,
+        estadoanterior: hist.estadoanterior,
+        estadonuevo: hist.estadonuevo,
+        observacion: hist.observacion,
+        cambiadoen: hist.cambiadoen,
+        cambiadopor: hist.usuarioCambio,
+        imagenes: hist.imagenes.map(img => ({
+          id: img.id,
+          rutaarchivo: img.rutaarchivo,
+          subidoen: img.subidoen,
+          subidopor: img.usuario
+        }))
+      }));
+
+      // Formatear valoraciones
+      const valoraciones = tiqueteCompleto.valoraciones.map(val => ({
+        id: val.id,
+        calificacion: val.calificacion,
+        comentario: val.comentario,
+        creadaen: val.creadaen,
+        cliente: val.cliente
+      }));
+
+      // Formatear respuesta
+      const tiqueteDetail = {
+        id: tiqueteCompleto.id,
+        titulo: tiqueteCompleto.titulo,
+        descripcion: tiqueteCompleto.descripcion,
+        prioridad: tiqueteCompleto.prioridad,
+        estado: tiqueteCompleto.estado,
+        creadoen: tiqueteCompleto.creadoen,
+        primerarespuestaen: tiqueteCompleto.primerarespuestaen,
+        resueltoen: tiqueteCompleto.resueltoen,
+        cerradoen: tiqueteCompleto.cerradoen,
+        vencerespuesta: tiqueteCompleto.vencerespuesta,
+        venceresolucion: tiqueteCompleto.venceresolucion,
+        categoria: {
+          id: tiqueteCompleto.categoria.id,
+          nombre: tiqueteCompleto.categoria.nombre,
+          descripcion: tiqueteCompleto.categoria.descripcion
+        },
+        cliente: tiqueteCompleto.cliente,
+        tecnicoActual: tiqueteCompleto.tecnicoActual || null,
+        sla: {
+          nombre: tiqueteCompleto.categoria.politicaSla.nombre,
+          descripcion: tiqueteCompleto.categoria.politicaSla.descripcion,
+          maxminutosrespuesta: tiqueteCompleto.categoria.politicaSla.maxminutosrespuesta,
+          maxminutosresolucion: tiqueteCompleto.categoria.politicaSla.maxminutosresolucion,
+          tiempoRespuestaHoras: Math.round(tiqueteCompleto.categoria.politicaSla.maxminutosrespuesta / 60 * 10) / 10,
+          tiempoResolucionHoras: Math.round(tiqueteCompleto.categoria.politicaSla.maxminutosresolucion / 60 * 10) / 10
+        },
+        cumplimiento: {
+          cumplioslarespuesta: tiqueteCompleto.cumplioslarespuesta,
+          cumplioslaresolucion: tiqueteCompleto.cumplioslaresolucion,
+          diasResolucion: diasResolucion,
+          horasRespuesta: horasRespuesta,
+          horasResolucion: horasResolucion
+        },
+        historiales: historiales,
+        valoraciones: valoraciones
+      };
+
+      response.json({
+        success: true,
+        message: 'Estado del ticket actualizado exitosamente',
+        data: {
+          tiquete: tiqueteDetail
+        }
+      });
+    } catch (error: any) {
+      console.error('Error al actualizar estado del ticket:', error);
+      next(error);
+    }
+  };
 }

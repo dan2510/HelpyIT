@@ -26,6 +26,9 @@ export class TiqueteRoutes {
     // PUT /api/tiquetes/:id - Actualizar ticket
     router.put("/:id", controller.update);
 
+    // PATCH /api/tiquetes/:id/estado - Actualizar estado con validaciones estrictas
+    router.patch("/:id/estado", authenticateJWT, controller.updateEstado);
+
     return router;
   }
 }
