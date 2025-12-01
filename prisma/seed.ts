@@ -40,7 +40,7 @@ const main = async () => {
     await prisma.usuario.create({
       data: {
         correo: "admin@helpyit.com",
-        contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+        contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
         nombrecompleto: "Administrador Sistema",
         telefono: "123-456-7890",
         rol: { connect: { id: 1 } },
@@ -55,7 +55,7 @@ const main = async () => {
     await prisma.usuario.create({
       data: {
         correo: "cliente@ibm.com",
-        contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+        contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
         nombrecompleto: "María González",
         telefono: "123-456-7891",
         rol: { connect: { id: 3 } },
@@ -70,7 +70,7 @@ const main = async () => {
     await prisma.usuario.create({
       data: {
         correo: "tecnico1@helpyit.com",
-        contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+        contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
         nombrecompleto: "Carlos Rodríguez",
         telefono: "123-456-7892",
         rol: { connect: { id: 2 } },
@@ -101,7 +101,7 @@ const main = async () => {
     await prisma.usuario.create({
       data: {
         correo: "tecnico2@helpyit",
-        contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+        contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
         nombrecompleto: "Ana López",
         telefono: "123-456-7893",
         rol: { connect: { id: 2 } },
@@ -129,7 +129,7 @@ const main = async () => {
       data: [
         {
           correo: "cliente1@empresa.com",
-          contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+          contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
           nombrecompleto: "Juan Pérez",
           telefono: "987-654-3210",
           idrol: 3,
@@ -140,7 +140,7 @@ const main = async () => {
         },
         {
           correo: "cliente2@microsoft.com",
-          contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+          contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
           nombrecompleto: "Laura Martínez",
           telefono: "987-654-3211",
           idrol: 3,
@@ -156,7 +156,7 @@ const main = async () => {
     await prisma.usuario.create({
       data: {
         correo: "tecnico3@helpyit.com",
-        contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+        contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
         nombrecompleto: "Roberto Silva",
         telefono: "123-456-7894",
         rol: { connect: { id: 2 } },
@@ -183,7 +183,7 @@ const main = async () => {
     await prisma.usuario.create({
       data: {
         correo: "tecnico4@helpyit.com",
-        contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+        contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
         nombrecompleto: "Patricia Morales",
         telefono: "123-456-7895",
         rol: { connect: { id: 2 } },
@@ -214,7 +214,7 @@ const main = async () => {
     await prisma.usuario.create({
       data: {
         correo: "cliente3@ibm.com",
-        contrasenahash: "$2b$10$1BaQqXuZYNLDAC42PY5fN.ufSOKjApmjkaZrQUYf7ms71PaS1mASO",
+        contrasenahash: "$2b$10$RLXRtvUua5Yf6QNiFXbSDOGcv7QBs44cy6D31dNqv0os7QPSN.tyG", // password123
         nombrecompleto: "Diego Ramírez",
         telefono: "987-654-3212",
         rol: { connect: { id: 3 } },
