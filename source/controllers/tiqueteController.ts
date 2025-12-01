@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/custom.error";
-import { PrismaClient, RoleNombre, EstadoTiquete } from "../../generated/prisma";
+import { PrismaClient, RoleNombre, EstadoTiquete, TipoHistorial } from "../../generated/prisma";
 
 export class TiqueteController {
   prisma = new PrismaClient();
@@ -264,7 +264,7 @@ export class TiqueteController {
         horasResolucion = Math.round(diffTime / (1000 * 60 * 60) * 10) / 10;
       }
 
-      // Formatear historial
+      // Formatear historial (incluye cambios de estado y comentarios)
       const historiales = tiquete.historiales.map(hist => ({
         id: hist.id,
         estadoanterior: hist.estadoanterior,
@@ -334,7 +334,7 @@ export class TiqueteController {
           horasResolucion: horasResolucion
         },
         
-        // Historial y valoraciones
+        // Historial (incluye cambios de estado y comentarios) y valoraciones
         historiales: historiales,
         valoraciones: valoraciones
       };
@@ -552,7 +552,8 @@ export class TiqueteController {
       const historialInicial = await this.prisma.historialTiquete.create({
         data: {
           idtiquete: nuevoTicket.id,
-          estadoanterior: EstadoTiquete.ABIERTO, // Estado inicial al crear
+          tipo: TipoHistorial.CAMBIO_ESTADO,
+          estadoanterior: EstadoTiquete.PENDIENTE, // Estado inicial al crear
           estadonuevo: EstadoTiquete.PENDIENTE,
           observacion: 'Ticket creado',
           cambiadopor: idcliente,
@@ -804,6 +805,7 @@ export class TiqueteController {
         await this.prisma.historialTiquete.create({
           data: {
             idtiquete: idTiquete,
+            tipo: TipoHistorial.CAMBIO_ESTADO,
             estadoanterior: estadoAnterior,
             estadonuevo: nuevoEstado,
             observacion: observacion || 'Técnico asignado',
@@ -1013,7 +1015,7 @@ export class TiqueteController {
         return next(AppError.unauthorized("Usuario no autenticado"));
       }
 
-      const { nuevoEstado, observacion, imagenes } = request.body;
+      const { nuevoEstado, observacion, imagenes, tipoObservacion } = request.body;
 
       // Validar que se proporcionó un nuevo estado
       if (!nuevoEstado) {
@@ -1036,7 +1038,7 @@ export class TiqueteController {
         return next(AppError.badRequest("Se requiere al menos una imagen como evidencia"));
       }
 
-      // Obtener el ticket actual
+      // Obtener el ticket actual con su categoría y SLA
       const tiqueteExistente = await this.prisma.tiquete.findUnique({
         where: { id: idTiquete },
         include: {
@@ -1044,6 +1046,16 @@ export class TiqueteController {
             select: {
               id: true,
               nombrecompleto: true
+            }
+          },
+          categoria: {
+            include: {
+              politicaSla: {
+                select: {
+                  maxminutosrespuesta: true,
+                  maxminutosresolucion: true
+                }
+              }
             }
           }
         }
@@ -1056,12 +1068,12 @@ export class TiqueteController {
       const estadoAnterior = tiqueteExistente.estado;
       const nuevoEstadoEnum = nuevoEstado as EstadoTiquete;
 
-      // Validar que no se intente cambiar al mismo estado
+      // Si no cambia el estado, solo se agrega observación (esto no debería llegar aquí, pero por seguridad)
       if (estadoAnterior === nuevoEstadoEnum) {
-        return next(AppError.badRequest("El ticket ya se encuentra en ese estado"));
+        return next(AppError.badRequest("Para agregar solo observación sin cambiar estado, use el endpoint de comentarios"));
       }
 
-      // Definir el flujo válido de estados
+      // Definir el flujo válido de estados (avanzar)
       const flujoValido: { [key in EstadoTiquete]?: EstadoTiquete[] } = {
         [EstadoTiquete.PENDIENTE]: [EstadoTiquete.ASIGNADO],
         [EstadoTiquete.ASIGNADO]: [EstadoTiquete.EN_PROGRESO],
@@ -1069,17 +1081,33 @@ export class TiqueteController {
         [EstadoTiquete.RESUELTO]: [EstadoTiquete.CERRADO]
       };
 
-      // Validar que la transición sigue el flujo válido
+      // Definir el flujo válido para retroceder (un paso atrás)
+      const flujoRetroceso: { [key in EstadoTiquete]?: EstadoTiquete } = {
+        [EstadoTiquete.ASIGNADO]: EstadoTiquete.PENDIENTE,
+        [EstadoTiquete.EN_PROGRESO]: EstadoTiquete.ASIGNADO,
+        [EstadoTiquete.RESUELTO]: EstadoTiquete.EN_PROGRESO,
+        [EstadoTiquete.CERRADO]: EstadoTiquete.RESUELTO
+      };
+
+      // Verificar si es un retroceso válido
+      const estadoRetroceso = flujoRetroceso[estadoAnterior];
+      const esRetrocesoValido = estadoRetroceso === nuevoEstadoEnum;
+
+      // Verificar si es un avance válido
       const estadosPermitidos = flujoValido[estadoAnterior];
-      if (!estadosPermitidos || !estadosPermitidos.includes(nuevoEstadoEnum)) {
+      const esAvanceValido = estadosPermitidos?.includes(nuevoEstadoEnum) || false;
+
+      // Validar que la transición es válida (avance o retroceso de un paso)
+      if (!esAvanceValido && !esRetrocesoValido) {
         return next(AppError.badRequest(
           `No se puede cambiar de ${estadoAnterior} a ${nuevoEstadoEnum}. ` +
-          `Transiciones válidas desde ${estadoAnterior}: ${estadosPermitidos?.join(', ') || 'ninguna'}`
+          `Transiciones válidas: avanzar a ${estadosPermitidos?.join(', ') || 'ninguna'} ` +
+          `${estadoRetroceso ? `o retroceder a ${estadoRetroceso}` : ''}`
         ));
       }
 
-      // Validar que no se puede avanzar sin técnico asignado (excepto desde Pendiente)
-      if (estadoAnterior !== EstadoTiquete.PENDIENTE && !tiqueteExistente.idtecnicoactual) {
+      // Validar que no se puede avanzar sin técnico asignado (excepto desde Pendiente o retrocediendo)
+      if (!esRetrocesoValido && estadoAnterior !== EstadoTiquete.PENDIENTE && !tiqueteExistente.idtecnicoactual) {
         return next(AppError.badRequest(
           "No se puede avanzar el estado sin un técnico asignado. " +
           "Solo se puede avanzar desde 'Pendiente' sin técnico asignado."
@@ -1091,16 +1119,63 @@ export class TiqueteController {
         estado: nuevoEstadoEnum
       };
 
-      // Actualizar fechas según el nuevo estado
+      // Actualizar fechas según el nuevo estado y calcular cumplimiento de SLA
       const ahora = new Date();
+      const fechaCreacion = new Date(tiqueteExistente.creadoen);
+      const sla = tiqueteExistente.categoria.politicaSla;
+
+      // Calcular cumplimiento de SLA de respuesta cuando se asigna
       if (nuevoEstadoEnum === EstadoTiquete.ASIGNADO && !tiqueteExistente.primerarespuestaen) {
         updateData.primerarespuestaen = ahora;
+        
+        // Calcular minutos transcurridos desde la creación hasta ahora
+        const tiempoTranscurridoMinutos = Math.floor((ahora.getTime() - fechaCreacion.getTime()) / (1000 * 60));
+        
+        // El SLA se cumple si el tiempo transcurrido es menor o igual al máximo permitido
+        const cumplioSlaRespuesta = tiempoTranscurridoMinutos <= sla.maxminutosrespuesta;
+        updateData.cumplioslarespuesta = cumplioSlaRespuesta;
       }
+
+      // Calcular cumplimiento de SLA de resolución cuando se resuelve
       if (nuevoEstadoEnum === EstadoTiquete.RESUELTO && !tiqueteExistente.resueltoen) {
         updateData.resueltoen = ahora;
+        
+        // Calcular minutos transcurridos desde la creación hasta ahora
+        const tiempoTranscurridoMinutos = Math.floor((ahora.getTime() - fechaCreacion.getTime()) / (1000 * 60));
+        
+        // El SLA se cumple si el tiempo transcurrido es menor o igual al máximo permitido
+        const cumplioSlaResolucion = tiempoTranscurridoMinutos <= sla.maxminutosresolucion;
+        updateData.cumplioslaresolucion = cumplioSlaResolucion;
       }
+
+      // Si se cierra, también verificar el SLA de resolución si no estaba resuelto antes
       if (nuevoEstadoEnum === EstadoTiquete.CERRADO && !tiqueteExistente.cerradoen) {
         updateData.cerradoen = ahora;
+        
+        // Si no estaba resuelto antes, calcular el SLA de resolución con la fecha de cierre
+        if (!tiqueteExistente.resueltoen) {
+          // Calcular minutos transcurridos desde la creación hasta ahora
+          const tiempoTranscurridoMinutos = Math.floor((ahora.getTime() - fechaCreacion.getTime()) / (1000 * 60));
+          
+          // El SLA se cumple si el tiempo transcurrido es menor o igual al máximo permitido
+          const cumplioSlaResolucion = tiempoTranscurridoMinutos <= sla.maxminutosresolucion;
+          updateData.cumplioslaresolucion = cumplioSlaResolucion;
+          updateData.resueltoen = ahora; // También marcar como resuelto al cerrar
+        }
+        // Si ya estaba resuelto, el SLA de resolución ya fue calculado, no recalcular
+      }
+
+      // Si la observación es EXTERNAL y aún no hay primera respuesta, actualizar SLA de respuesta
+      // Esto se aplica independientemente del cambio de estado
+      const tipoObs = tipoObservacion || 'INTERNAL';
+      if (tipoObs === 'EXTERNAL' && !tiqueteExistente.primerarespuestaen) {
+        // Solo actualizar si no se actualizó ya por el cambio de estado a ASIGNADO
+        if (!updateData.primerarespuestaen) {
+          updateData.primerarespuestaen = ahora;
+          const tiempoTranscurridoMinutos = Math.floor((ahora.getTime() - fechaCreacion.getTime()) / (1000 * 60));
+          const cumplioSlaRespuesta = tiempoTranscurridoMinutos <= sla.maxminutosrespuesta;
+          updateData.cumplioslarespuesta = cumplioSlaRespuesta;
+        }
       }
 
       // Actualizar el ticket
@@ -1143,6 +1218,7 @@ export class TiqueteController {
       const historialCreado = await this.prisma.historialTiquete.create({
         data: {
           idtiquete: idTiquete,
+          tipo: TipoHistorial.CAMBIO_ESTADO,
           estadoanterior: estadoAnterior,
           estadonuevo: nuevoEstadoEnum,
           observacion: observacion.trim(),
@@ -1178,6 +1254,25 @@ export class TiqueteController {
           }
         }
       });
+
+      // Si la observación es EXTERNAL, crear un comentario external automáticamente
+      // (El SLA ya se actualizó antes de actualizar el ticket)
+      // Nota: Este comentario se crea después del cambio de estado, así que usa el nuevo estado
+      if (tipoObs === 'EXTERNAL') {
+        // Crear comentario external con la misma observación
+        // Establecer el nuevo estado en ambos campos para indicar que se mantiene después del cambio
+        await this.prisma.historialTiquete.create({
+          data: {
+            idtiquete: idTiquete,
+            tipo: TipoHistorial.COMENTARIO_EXTERNAL,
+            observacion: observacion.trim(),
+            estadoanterior: nuevoEstadoEnum,
+            estadonuevo: nuevoEstadoEnum,
+            cambiadopor: usuarioAutenticado.id,
+            cambiadoen: ahora
+          }
+        });
+      }
 
       // Obtener el ticket completo con historial actualizado
       const tiqueteCompleto = await this.prisma.tiquete.findFirst({
@@ -1347,6 +1442,210 @@ export class TiqueteController {
       });
     } catch (error: any) {
       console.error('Error al actualizar estado del ticket:', error);
+      next(error);
+    }
+  };
+
+  // Agregar comentario (external o internal) y actualizar SLA si es necesario
+  agregarComentario = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const idTiquete = parseInt(request.params.id);
+      if (isNaN(idTiquete)) {
+        return next(AppError.badRequest("El ID no es válido"));
+      }
+
+      const usuarioAutenticado = request.user as any;
+      if (!usuarioAutenticado || !usuarioAutenticado.id) {
+        return next(AppError.unauthorized("Usuario no autenticado"));
+      }
+
+      const { tipo, contenido } = request.body;
+
+      if (!tipo || (tipo !== 'EXTERNAL' && tipo !== 'INTERNAL')) {
+        return next(AppError.badRequest("El tipo de comentario debe ser EXTERNAL o INTERNAL"));
+      }
+
+      if (!contenido || contenido.trim().length === 0) {
+        return next(AppError.badRequest("El contenido del comentario es obligatorio"));
+      }
+
+      // Obtener el ticket con su SLA
+      const tiqueteExistente = await this.prisma.tiquete.findUnique({
+        where: { id: idTiquete },
+        include: {
+          categoria: { include: { politicaSla: true } }
+        }
+      });
+
+      if (!tiqueteExistente) {
+        return next(AppError.notFound("Ticket no encontrado"));
+      }
+
+      const ahora = new Date();
+      const updateData: any = {};
+
+      // Si es un comentario EXTERNAL y aún no hay primera respuesta, actualizar SLA
+      if (tipo === 'EXTERNAL' && !tiqueteExistente.primerarespuestaen) {
+        updateData.primerarespuestaen = ahora;
+        const fechaCreacion = new Date(tiqueteExistente.creadoen);
+        const tiempoTranscurridoMinutos = Math.floor((ahora.getTime() - fechaCreacion.getTime()) / (1000 * 60));
+        const cumplioSlaRespuesta = tiempoTranscurridoMinutos <= tiqueteExistente.categoria.politicaSla.maxminutosrespuesta;
+        updateData.cumplioslarespuesta = cumplioSlaRespuesta;
+      }
+
+      // Crear el historial como comentario (sin cambio de estado)
+      // Establecer el estado actual en ambos campos para indicar que se mantiene igual
+      const estadoActual = tiqueteExistente.estado;
+      const tipoHistorial = tipo === 'EXTERNAL' ? TipoHistorial.COMENTARIO_EXTERNAL : TipoHistorial.COMENTARIO_INTERNAL;
+      const historial = await this.prisma.historialTiquete.create({
+        data: {
+          idtiquete: idTiquete,
+          tipo: tipoHistorial,
+          observacion: contenido.trim(),
+          estadoanterior: estadoActual,
+          estadonuevo: estadoActual,
+          cambiadopor: usuarioAutenticado.id
+        },
+        include: {
+          usuarioCambio: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true,
+              telefono: true
+            }
+          }
+        }
+      });
+
+      // Actualizar el ticket si hay cambios en SLA o descripción
+      if (Object.keys(updateData).length > 0) {
+        await this.prisma.tiquete.update({
+          where: { id: idTiquete },
+          data: updateData
+        });
+      }
+
+      // Obtener el ticket actualizado con todos sus datos
+      const tiqueteActualizado = await this.prisma.tiquete.findFirst({
+        where: { id: idTiquete },
+        include: {
+          categoria: { include: { politicaSla: true } },
+          cliente: { select: { id: true, nombrecompleto: true, correo: true, telefono: true } },
+          tecnicoActual: { select: { id: true, nombrecompleto: true, correo: true, telefono: true } },
+          historiales: {
+            include: {
+              usuarioCambio: { select: { id: true, nombrecompleto: true, correo: true, telefono: true } },
+              imagenes: { include: { usuario: { select: { id: true, nombrecompleto: true, correo: true } } } }
+            },
+            orderBy: { cambiadoen: 'desc' }
+          },
+          valoraciones: { include: { cliente: { select: { id: true, nombrecompleto: true, correo: true } } } }
+        }
+      });
+
+      if (!tiqueteActualizado) {
+        return next(AppError.internalServer("Error al obtener el ticket actualizado"));
+      }
+
+      // Calcular tiempos para la respuesta
+      let diasResolucion = null;
+      if (tiqueteActualizado.resueltoen) {
+        const diffTime = Math.abs(new Date(tiqueteActualizado.resueltoen).getTime() - new Date(tiqueteActualizado.creadoen).getTime());
+        diasResolucion = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      let horasRespuesta = null;
+      if (tiqueteActualizado.primerarespuestaen) {
+        const diffTime = Math.abs(new Date(tiqueteActualizado.primerarespuestaen).getTime() - new Date(tiqueteActualizado.creadoen).getTime());
+        horasRespuesta = Math.round(diffTime / (1000 * 60 * 60) * 10) / 10;
+      }
+
+      let horasResolucion = null;
+      if (tiqueteActualizado.resueltoen) {
+        const diffTime = Math.abs(new Date(tiqueteActualizado.resueltoen).getTime() - new Date(tiqueteActualizado.creadoen).getTime());
+        horasResolucion = Math.round(diffTime / (1000 * 60 * 60) * 10) / 10;
+      }
+
+      // Formatear historial (incluye cambios de estado y comentarios)
+      const historiales = tiqueteActualizado.historiales.map(hist => ({
+        id: hist.id,
+        tipo: hist.tipo,
+        estadoanterior: hist.estadoanterior,
+        estadonuevo: hist.estadonuevo,
+        observacion: hist.observacion,
+        cambiadoen: hist.cambiadoen,
+        cambiadopor: hist.usuarioCambio,
+        imagenes: hist.imagenes.map(img => ({
+          id: img.id,
+          rutaarchivo: img.rutaarchivo,
+          subidoen: img.subidoen,
+          subidopor: img.usuario
+        }))
+      }));
+
+      const valoraciones = tiqueteActualizado.valoraciones.map(val => ({
+        id: val.id,
+        calificacion: val.calificacion,
+        comentario: val.comentario,
+        creadaen: val.creadaen,
+        cliente: val.cliente
+      }));
+
+      const tiqueteDetail = {
+        id: tiqueteActualizado.id,
+        titulo: tiqueteActualizado.titulo,
+        descripcion: tiqueteActualizado.descripcion,
+        prioridad: tiqueteActualizado.prioridad,
+        estado: tiqueteActualizado.estado,
+        creadoen: tiqueteActualizado.creadoen,
+        primerarespuestaen: tiqueteActualizado.primerarespuestaen,
+        resueltoen: tiqueteActualizado.resueltoen,
+        cerradoen: tiqueteActualizado.cerradoen,
+        vencerespuesta: tiqueteActualizado.vencerespuesta,
+        venceresolucion: tiqueteActualizado.venceresolucion,
+        categoria: {
+          id: tiqueteActualizado.categoria.id,
+          nombre: tiqueteActualizado.categoria.nombre,
+          descripcion: tiqueteActualizado.categoria.descripcion
+        },
+        cliente: tiqueteActualizado.cliente,
+        tecnicoActual: tiqueteActualizado.tecnicoActual || null,
+        sla: {
+          nombre: tiqueteActualizado.categoria.politicaSla.nombre,
+          descripcion: tiqueteActualizado.categoria.politicaSla.descripcion,
+          maxminutosrespuesta: tiqueteActualizado.categoria.politicaSla.maxminutosrespuesta,
+          maxminutosresolucion: tiqueteActualizado.categoria.politicaSla.maxminutosresolucion,
+          tiempoRespuestaHoras: Math.round(tiqueteActualizado.categoria.politicaSla.maxminutosrespuesta / 60 * 10) / 10,
+          tiempoResolucionHoras: Math.round(tiqueteActualizado.categoria.politicaSla.maxminutosresolucion / 60 * 10) / 10
+        },
+        cumplimiento: {
+          cumplioslarespuesta: tiqueteActualizado.cumplioslarespuesta,
+          cumplioslaresolucion: tiqueteActualizado.cumplioslaresolucion,
+          diasResolucion: diasResolucion,
+          horasRespuesta: horasRespuesta,
+          horasResolucion: horasResolucion
+        },
+        historiales: historiales,
+        valoraciones: valoraciones
+      };
+
+      response.json({
+        success: true,
+        message: tipo === 'EXTERNAL' ? 'Comentario público agregado exitosamente' : 'Comentario interno agregado exitosamente',
+        data: {
+          historial: {
+            id: historial.id,
+            tipo: historial.tipo,
+            observacion: historial.observacion,
+            cambiadoen: historial.cambiadoen,
+            cambiadopor: historial.usuarioCambio
+          },
+          tiquete: tiqueteDetail
+        }
+      });
+    } catch (error: any) {
+      console.error('Error al agregar comentario:', error);
       next(error);
     }
   };

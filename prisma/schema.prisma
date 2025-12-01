@@ -136,7 +136,7 @@ model Tiquete {
   titulo                 String   @db.VarChar(140)
   descripcion            String   @db.Text
   prioridad              Prioridad @default(MEDIA)
-  estado                 EstadoTiquete @default(ABIERTO)
+  estado                 EstadoTiquete @default(PENDIENTE)
   idcategoria            Int
   idcliente              Int
   idtecnicoactual        Int?
@@ -183,9 +183,10 @@ model AsignacionTiquete {
 model HistorialTiquete {
   id             Int      @id @default(autoincrement())
   idtiquete      Int
-  estadoanterior EstadoTiquete 
-  estadonuevo    EstadoTiquete 
+  estadoanterior EstadoTiquete? 
+  estadonuevo    EstadoTiquete? 
   observacion    String?  @db.Text
+  tipo           TipoHistorial @default(CAMBIO_ESTADO)
   cambiadopor    Int     
   cambiadoen     DateTime @default(now())
   
@@ -307,9 +308,8 @@ enum Prioridad {
 }
 
 enum EstadoTiquete {
-  ABIERTO
-  EN_PROGRESO
   PENDIENTE
+  EN_PROGRESO
   RESUELTO
   CERRADO
   CANCELADO
@@ -339,4 +339,10 @@ enum MetodoAsignacion {
   MANUAL
   AUTOMATICO
   REGLA
+}
+
+enum TipoHistorial {
+  CAMBIO_ESTADO
+  COMENTARIO_EXTERNAL
+  COMENTARIO_INTERNAL
 }

@@ -25,7 +25,7 @@ export class ImageController {
           console.log(`Archivo eliminado: ${previousFilePath}`);
         }
       }
-      response.status(200).send({
+      response.status(200).send({ 
         message: "Archivo subido exitosamente",
         fileName: request.file.filename,
       });

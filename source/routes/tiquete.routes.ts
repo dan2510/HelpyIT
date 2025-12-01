@@ -29,6 +29,9 @@ export class TiqueteRoutes {
     // PATCH /api/tiquetes/:id/estado - Actualizar estado con validaciones estrictas
     router.patch("/:id/estado", authenticateJWT, controller.updateEstado);
 
+    // POST /api/tiquetes/:id/comentarios - Agregar comentario (external o internal)
+    router.post("/:id/comentarios", authenticateJWT, controller.agregarComentario);
+
     return router;
   }
 }

@@ -76,7 +76,7 @@ const main = async () => {
         rol: { connect: { id: 2 } },
         activo: true,
         disponibilidad: Disponibilidad.DISPONIBLE,
-        cargaactual: 5, // 5 tickets activos: Ticket 1 (ABIERTO), 6 (PENDIENTE), 7 (ASIGNADO), 8 (EN_PROGRESO), 9 (ABIERTO)
+        cargaactual: 5, // 5 tickets activos: Ticket 1 (PENDIENTE), 6 (PENDIENTE), 7 (ASIGNADO), 8 (EN_PROGRESO), 9 (PENDIENTE)
         maxticketsimultaneos: 6,
         especialidades: {
           create: [
@@ -291,7 +291,7 @@ const main = async () => {
         titulo: "Sistema de facturación no responde",
         descripcion: "El sistema de facturación está completamente inaccesible desde las 9:00 AM. Los usuarios no pueden generar facturas.",
         prioridad: Prioridad.CRITICA,
-        estado: EstadoTiquete.ABIERTO,
+        estado: EstadoTiquete.PENDIENTE,
         categoria: { connect: { id: 1 } }, // Incidente Crítico
         cliente: { connect: { id: 5 } }, // Juan Pérez
         tecnicoActual: { connect: { id: 3 } }, // Carlos Rodríguez
@@ -312,8 +312,8 @@ const main = async () => {
         historiales: {
           create: [
             {
-              estadoanterior: EstadoTiquete.ABIERTO,
-              estadonuevo: EstadoTiquete.ABIERTO,
+              estadoanterior: EstadoTiquete.PENDIENTE,
+              estadonuevo: EstadoTiquete.PENDIENTE,
               observacion: "Ticket creado y asignado automáticamente",
               usuarioCambio: { connect: { id: 1 } }, // Admin
             
@@ -371,7 +371,7 @@ const main = async () => {
         historiales: {
           create: [
             {
-              estadoanterior: EstadoTiquete.ABIERTO,
+              estadoanterior: EstadoTiquete.PENDIENTE,
               estadonuevo: EstadoTiquete.EN_PROGRESO,
               observacion: "Iniciando diagnóstico del error en reportes",
               usuarioCambio: { connect: { id: 4 } }, // Ana López
@@ -430,7 +430,7 @@ const main = async () => {
         historiales: {
           create: [
             {
-              estadoanterior: EstadoTiquete.ABIERTO,
+              estadoanterior: EstadoTiquete.PENDIENTE,
               estadonuevo: EstadoTiquete.EN_PROGRESO,
               observacion: "Asignado a técnico, procesando solicitud de acceso",
               usuarioCambio: { connect: { id: 7 } }, // Roberto Silva
@@ -490,7 +490,7 @@ const main = async () => {
         historiales: {
           create: [
             {
-              estadoanterior: EstadoTiquete.ABIERTO,
+              estadoanterior: EstadoTiquete.PENDIENTE,
               estadonuevo: EstadoTiquete.ASIGNADO,
               observacion: "Ticket de seguridad asignado por alta prioridad",
               usuarioCambio: { connect: { id: 1 } }, // Admin
@@ -554,7 +554,7 @@ const main = async () => {
         historiales: {
           create: [
             {
-              estadoanterior: EstadoTiquete.ABIERTO,
+              estadoanterior: EstadoTiquete.PENDIENTE,
               estadonuevo: EstadoTiquete.EN_PROGRESO,
               observacion: "Iniciando búsqueda de cursos disponibles",
               usuarioCambio: { connect: { id: 7 } }, // Roberto Silva
@@ -684,7 +684,7 @@ await prisma.tiquete.create({
     titulo: "Soporte para instalación de aplicación",
     descripcion: "Usuario requiere asistencia para instalar nueva herramienta",
     prioridad: Prioridad.BAJA,
-    estado: EstadoTiquete.ABIERTO,
+    estado: EstadoTiquete.PENDIENTE,
     categoria: { connect: { id: 9 } },
     cliente: { connect: { id: 5 } },
     tecnicoActual: { connect: { id: 3 } },
