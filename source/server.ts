@@ -5,16 +5,21 @@ import cors from 'cors';
 import path from 'path'
 import { ErrorMiddleware } from './middleware/error.middleware';
 import { AppRoutes } from './routes/routes';
-//Recordar
-//import "./config/passport"; 
+
+// Cargar variables de entorno ANTES de importar passport
+// Especificar la ruta del .env en el directorio raíz del servidor
+const envPath = path.resolve(__dirname, '../.env');
+dotenv.config({ path: envPath });
+
+// Importar passport después de cargar las variables de entorno
+import "./config/passport"; 
 
 
 const rootDir = __dirname;
 
 const app: Express=express()
 
-// Acceder a la configuracion del archivo .env
-dotenv.config();
+// Las variables de entorno ya fueron cargadas antes de importar passport
 // Puerto que escucha por defecto 3000 o definido .env
 const port = process.env.PORT || 3000;
 // Middleware CORS para aceptar llamadas en el servidor

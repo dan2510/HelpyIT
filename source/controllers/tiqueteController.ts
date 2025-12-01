@@ -5,17 +5,20 @@ import { PrismaClient, RoleNombre, EstadoTiquete } from "../../generated/prisma"
 export class TiqueteController {
   prisma = new PrismaClient();
 
-  // Listado de tiquetes según el rol del usuario
+  // Listado de tiquetes según el rol del usuario autenticado
   // Retorna estructura: { success: boolean, data: { tiquetes: TiqueteListItem[] } }
   getTiquetesPorUsuario = async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const idUsuario = parseInt(request.params.idUsuario);
+      // Obtener el usuario autenticado desde req.user (agregado por authenticateJWT)
+      const usuarioAutenticado = request.user as any;
       
-      if (isNaN(idUsuario)) {
-        return next(AppError.badRequest("El ID de usuario no es válido"));
+      if (!usuarioAutenticado || !usuarioAutenticado.id) {
+        return next(AppError.unauthorized("Usuario no autenticado"));
       }
 
-      // Obtener el usuario y su rol
+      const idUsuario = usuarioAutenticado.id;
+
+      // Obtener el usuario completo con su rol
       const usuario = await this.prisma.usuario.findUnique({
         where: { id: idUsuario },
         include: {
@@ -352,6 +355,27 @@ export class TiqueteController {
   // Listado general de todos los tiquetes (solo para admin)
   get = async (request: Request, response: Response, next: NextFunction) => {
     try {
+      // Verificar que el usuario autenticado es admin
+      const usuarioAutenticado = request.user as any;
+      
+      if (!usuarioAutenticado || !usuarioAutenticado.id) {
+        return next(AppError.unauthorized("Usuario no autenticado"));
+      }
+
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioAutenticado.id },
+        include: { rol: true }
+      });
+
+      if (!usuario) {
+        return next(AppError.notFound("Usuario no encontrado"));
+      }
+
+      // Solo admin puede ver todos los tiquetes
+      if (usuario.rol.nombre !== RoleNombre.ADMIN) {
+        return next(AppError.forbidden("Solo los administradores pueden ver todos los tiquetes"));
+      }
+
       const listadoTiquetes = await this.prisma.tiquete.findMany({
         select: {
           id: true,
@@ -403,14 +427,37 @@ export class TiqueteController {
   // CREAR NUEVO TICKET
   create = async (request: Request, response: Response, next: NextFunction) => {
     try {
+      // Obtener el usuario autenticado
+      const usuarioAutenticado = request.user as any;
+      
+      if (!usuarioAutenticado || !usuarioAutenticado.id) {
+        return next(AppError.unauthorized("Usuario no autenticado"));
+      }
+
       const { 
         titulo,
         descripcion,
         prioridad,
         idetiqueta, // ID de la etiqueta seleccionada
-        idcliente, // ID del usuario solicitante (desde variable en lógica del frontend)
         imagenes // Array de nombres de archivos subidos
       } = request.body;
+
+      // Verificar que el usuario autenticado es un cliente o admin
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioAutenticado.id },
+        include: { rol: true }
+      });
+
+      if (!usuario) {
+        return next(AppError.notFound("Usuario no encontrado"));
+      }
+
+      // Solo clientes y admins pueden crear tiquetes
+      // Si es admin, puede crear tiquetes en nombre de otros, pero por defecto usa su propio ID
+      // Si es cliente, solo puede crear tiquetes para sí mismo
+      const idcliente = usuario.rol.nombre === RoleNombre.CLIENTE 
+        ? usuario.id 
+        : usuario.id; // Por ahora, todos crean tiquetes para sí mismos
 
       // Validaciones
       const validationErrors: any[] = [];
@@ -440,13 +487,6 @@ export class TiqueteController {
         validationErrors.push({
           fields: ['idetiqueta'],
           constraint: 'Debe seleccionar una etiqueta'
-        });
-      }
-
-      if (!idcliente) {
-        validationErrors.push({
-          fields: ['idcliente'],
-          constraint: 'El usuario solicitante es requerido'
         });
       }
 
@@ -486,7 +526,7 @@ export class TiqueteController {
           prioridad: prioridad,
           estado: EstadoTiquete.PENDIENTE,
           categoria: { connect: { id: categoria.id } },
-          cliente: { connect: { id: parseInt(idcliente) } },
+          cliente: { connect: { id: idcliente } },
           creadoen: fechaCreacion,
           vencerespuesta: venceRespuesta,
           venceresolucion: venceResolucion
@@ -515,14 +555,14 @@ export class TiqueteController {
           estadoanterior: EstadoTiquete.ABIERTO, // Estado inicial al crear
           estadonuevo: EstadoTiquete.PENDIENTE,
           observacion: 'Ticket creado',
-          cambiadopor: parseInt(idcliente),
+          cambiadopor: idcliente,
           cambiadoen: fechaCreacion,
           // Crear las imágenes asociadas al historial si hay
           imagenes: imagenes && Array.isArray(imagenes) && imagenes.length > 0
             ? {
                 create: imagenes.map((nombreArchivo: string) => ({
                   rutaarchivo: nombreArchivo,
-                  subidopor: parseInt(idcliente),
+                  subidopor: idcliente,
                   subidoen: fechaCreacion
                 }))
               }

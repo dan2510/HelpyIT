@@ -1,28 +1,66 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/custom.error";
-import { PrismaClient } from "../../generated/prisma";
+import { PrismaClient, RoleNombre } from "../../generated/prisma";
 
 export class AsignacionController {
   prisma = new PrismaClient();
 
-  // Obtener asignaciones por semana para un técnico
+  // Obtener asignaciones por semana para el técnico autenticado o todas las asignaciones si es admin
   getAsignacionesPorSemana = async (request: Request, response: Response, next: NextFunction) => {
     try {
-      const idTecnico = parseInt(request.params.idTecnico);
-      const { fechaInicio, fechaFin } = request.query;
-
-      if (isNaN(idTecnico)) {
-        return next(AppError.badRequest("El ID de técnico no es válido"));
+      // Obtener el usuario autenticado desde req.user
+      const usuarioAutenticado = request.user as any;
+      
+      if (!usuarioAutenticado || !usuarioAutenticado.id) {
+        return next(AppError.unauthorized("Usuario no autenticado"));
       }
 
-      // Verificar que el técnico existe
-      const tecnico = await this.prisma.usuario.findUnique({
-        where: { id: idTecnico },
-        select: { id: true, nombrecompleto: true }
+      const { fechaInicio, fechaFin, idTecnico } = request.query;
+
+      // Verificar el usuario autenticado
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioAutenticado.id },
+        include: {
+          rol: true
+        }
       });
 
-      if (!tecnico) {
-        return next(AppError.notFound("Técnico no encontrado"));
+      if (!usuario) {
+        return next(AppError.notFound("Usuario no encontrado"));
+      }
+
+      // Determinar qué técnico ver
+      let idTecnicoFiltro: number | null = null;
+      let tecnico: any = null;
+
+      if (usuario.rol.nombre === RoleNombre.ADMIN) {
+        // Si es admin y se especifica un técnico, ver ese técnico
+        // Si no se especifica, ver todas las asignaciones
+        if (idTecnico) {
+          idTecnicoFiltro = parseInt(idTecnico as string);
+          tecnico = await this.prisma.usuario.findUnique({
+            where: { id: idTecnicoFiltro },
+            select: { 
+              id: true, 
+              nombrecompleto: true
+            }
+          });
+          if (!tecnico) {
+            return next(AppError.notFound("Técnico no encontrado"));
+          }
+        } else {
+          // Admin sin técnico específico - ver todas las asignaciones
+          tecnico = { id: null, nombrecompleto: 'Todos los Técnicos' };
+        }
+      } else if (usuario.rol.nombre === RoleNombre.TECNICO) {
+        // Si es técnico, solo puede ver sus propias asignaciones
+        idTecnicoFiltro = usuario.id;
+        tecnico = {
+          id: usuario.id,
+          nombrecompleto: usuario.nombrecompleto
+        };
+      } else {
+        return next(AppError.forbidden("Solo los técnicos y administradores pueden ver asignaciones"));
       }
 
       // Definir rango de fechas (si no se proporciona, usar la semana actual)
@@ -47,15 +85,25 @@ export class AsignacionController {
         endDate.setHours(23, 59, 59, 999);
       }
 
-      // Obtener tickets asignados al técnico en el rango de fechas
+      // Construir el filtro where según el rol
+      const whereClause: any = {
+        creadoen: {
+          gte: startDate,
+          lte: endDate
+        }
+      };
+
+      // Si se especifica un técnico, filtrar por ese técnico
+      if (idTecnicoFiltro !== null) {
+        whereClause.idtecnicoactual = idTecnicoFiltro;
+      } else {
+        // Admin viendo todas las asignaciones - solo tiquetes que tienen técnico asignado
+        whereClause.idtecnicoactual = { not: null };
+      }
+
+      // Obtener tickets asignados en el rango de fechas
       const asignaciones = await this.prisma.tiquete.findMany({
-        where: {
-          idtecnicoactual: idTecnico,
-          creadoen: {
-            gte: startDate,
-            lte: endDate
-          }
-        },
+        where: whereClause,
         select: {
           id: true,
           titulo: true,
@@ -79,6 +127,13 @@ export class AsignacionController {
             }
           },
           cliente: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true
+            }
+          },
+          tecnicoActual: {
             select: {
               id: true,
               nombrecompleto: true,
@@ -112,6 +167,7 @@ export class AsignacionController {
           creadoen: ticket.creadoen,
           categoria: ticket.categoria,
           cliente: ticket.cliente,
+          tecnicoActual: ticket.tecnicoActual,
           sla: {
             nombre: ticket.categoria.politicaSla.nombre,
             venceresolucion: ticket.venceresolucion,
