@@ -8,6 +8,7 @@ import { EspecialidadRoutes } from "./especialidad.routes";
 import { EtiquetaRoutes } from "./etiqueta.routes";
 import { PoliticaSlaRoutes } from "./politicaSla.routes";
 import { UsuarioRoutes } from "./usuario.routes";
+import NotificacionRoutes from "./notificacion.routes";
 
 export class AppRoutes {
   static get routes(): Router {
@@ -22,6 +23,7 @@ export class AppRoutes {
     router.use("/etiqueta", EtiquetaRoutes.routes);
     router.use("/politica-sla", PoliticaSlaRoutes.routes);
     router.use("/usuario", UsuarioRoutes.routes);
+    router.use("/notificaciones", NotificacionRoutes);
 
     return router;
   }

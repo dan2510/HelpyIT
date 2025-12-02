@@ -321,6 +321,7 @@ enum TipoNotificacion {
   CAMBIO_ESTADO
   MENSAJE
   RECORDATORIO
+  INICIO_SESION
 }
 
 enum EstadoNotificacion {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/custom.error";
-import { PrismaClient, RoleNombre, EstadoTiquete, TipoHistorial } from "../../generated/prisma";
+import { PrismaClient, RoleNombre, EstadoTiquete, TipoHistorial, TipoNotificacion } from "../../generated/prisma";
+import { NotificacionController } from "./notificacionController";
 
 export class TiqueteController {
   prisma = new PrismaClient();
@@ -584,6 +585,38 @@ export class TiqueteController {
         }
       });
 
+      // Generar notificaciones para administradores sobre el nuevo ticket
+      try {
+        const administradores = await this.prisma.usuario.findMany({
+          where: {
+            rol: {
+              nombre: RoleNombre.ADMIN
+            },
+            activo: true
+          },
+          select: {
+            id: true
+          }
+        });
+
+        for (const admin of administradores) {
+          await NotificacionController.crearNotificacion(
+            this.prisma,
+            {
+              tipo: TipoNotificacion.CAMBIO_ESTADO,
+              idusuariodestino: admin.id,
+              idusuarioorigen: idcliente,
+              idtiquete: nuevoTicket.id,
+              titulo: 'Nuevo ticket creado',
+              contenido: `Se ha creado un nuevo ticket: "${nuevoTicket.titulo}" por ${nuevoTicket.cliente.nombrecompleto}. Prioridad: ${prioridad}.`
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Error al crear notificaciones para administradores:', error);
+        // No fallar la creación del ticket si falla la notificación
+      }
+
       response.status(201).json({
         success: true,
         message: 'Ticket creado exitosamente',
@@ -813,6 +846,44 @@ export class TiqueteController {
           }
         });
         historialCreado = true;
+
+        // Generar notificaciones cuando se asigna un técnico
+        if (idtecnicoactual !== null && idtecnicoactual !== undefined) {
+          try {
+            const tecnicoId = parseInt(idtecnicoactual);
+            
+            // Notificar al técnico asignado
+            await NotificacionController.crearNotificacion(
+              this.prisma,
+              {
+                tipo: TipoNotificacion.ASIGNACION,
+                idusuariodestino: tecnicoId,
+                idusuarioorigen: parseInt(usuarioCambioId.toString()),
+                idtiquete: idTiquete,
+                titulo: 'Ticket asignado',
+                contenido: `Se te ha asignado el ticket "${tiqueteExistente.titulo}". ${observacion || 'Técnico asignado'}.`
+              }
+            );
+
+            // Notificar al cliente sobre la asignación
+            if (tiqueteExistente.idcliente) {
+              await NotificacionController.crearNotificacion(
+                this.prisma,
+                {
+                  tipo: TipoNotificacion.ASIGNACION,
+                  idusuariodestino: tiqueteExistente.idcliente,
+                  idusuarioorigen: parseInt(usuarioCambioId.toString()),
+                  idtiquete: idTiquete,
+                  titulo: 'Técnico asignado a tu ticket',
+                  contenido: `Se ha asignado un técnico al ticket "${tiqueteExistente.titulo}". ${observacion || 'Técnico asignado'}.`
+                }
+              );
+            }
+          } catch (error) {
+            console.error('Error al crear notificaciones de asignación:', error);
+            // No fallar la asignación si falla la notificación
+          }
+        }
       }
 
       // Si se creó un historial, recargar el ticket con el historial actualizado
@@ -1259,6 +1330,56 @@ export class TiqueteController {
       // El historial de cambio de estado ya contiene la observación
       // Si se necesita un comentario EXTERNAL separado, debe agregarse después usando el endpoint de comentarios
 
+      // Generar notificación para el cliente sobre el cambio de estado
+      if (tiqueteExistente.idcliente) {
+        try {
+          const estadoAnteriorNombre = this.getEstadoNombreTexto(estadoAnterior);
+          const estadoNuevoNombre = this.getEstadoNombreTexto(nuevoEstadoEnum);
+          
+          console.log(`📧 Creando notificación para cliente ID=${tiqueteExistente.idcliente} sobre cambio de estado del ticket ${idTiquete}`);
+          
+          await NotificacionController.crearNotificacion(
+            this.prisma,
+            {
+              tipo: TipoNotificacion.CAMBIO_ESTADO,
+              idusuariodestino: tiqueteExistente.idcliente,
+              idusuarioorigen: usuarioAutenticado.id,
+              idtiquete: idTiquete,
+              titulo: `Estado del ticket actualizado`,
+              contenido: `El ticket "${tiqueteExistente.titulo}" cambió de estado de "${estadoAnteriorNombre}" a "${estadoNuevoNombre}". ${observacion.trim()}`
+            }
+          );
+        } catch (error) {
+          console.error('❌ Error al crear notificación para cliente:', error);
+          // No fallar la actualización del ticket si falla la notificación
+        }
+      }
+
+      // Si hay técnico asignado, también notificarle
+      if (tiqueteExistente.idtecnicoactual && tiqueteExistente.idtecnicoactual !== usuarioAutenticado.id) {
+        try {
+          const estadoAnteriorNombre = this.getEstadoNombreTexto(estadoAnterior);
+          const estadoNuevoNombre = this.getEstadoNombreTexto(nuevoEstadoEnum);
+          
+          console.log(`📧 Creando notificación para técnico ID=${tiqueteExistente.idtecnicoactual} sobre cambio de estado del ticket ${idTiquete}`);
+          
+          await NotificacionController.crearNotificacion(
+            this.prisma,
+            {
+              tipo: TipoNotificacion.CAMBIO_ESTADO,
+              idusuariodestino: tiqueteExistente.idtecnicoactual,
+              idusuarioorigen: usuarioAutenticado.id,
+              idtiquete: idTiquete,
+              titulo: `Estado del ticket actualizado`,
+              contenido: `El ticket "${tiqueteExistente.titulo}" cambió de estado de "${estadoAnteriorNombre}" a "${estadoNuevoNombre}". ${observacion.trim()}`
+            }
+          );
+        } catch (error) {
+          console.error('❌ Error al crear notificación para técnico:', error);
+          // No fallar la actualización del ticket si falla la notificación
+        }
+      }
+
       // Obtener el ticket completo con historial actualizado
       const tiqueteCompleto = await this.prisma.tiquete.findFirst({
         where: { id: idTiquete },
@@ -1634,4 +1755,17 @@ export class TiqueteController {
       next(error);
     }
   };
+
+  // Método auxiliar para obtener el nombre del estado en texto
+  private getEstadoNombreTexto(estado: EstadoTiquete): string {
+    const nombres: { [key in EstadoTiquete]: string } = {
+      [EstadoTiquete.PENDIENTE]: 'Pendiente',
+      [EstadoTiquete.ASIGNADO]: 'Asignado',
+      [EstadoTiquete.EN_PROGRESO]: 'En Proceso',
+      [EstadoTiquete.RESUELTO]: 'Resuelto',
+      [EstadoTiquete.CERRADO]: 'Cerrado',
+      [EstadoTiquete.CANCELADO]: 'Cancelado'
+    };
+    return nombres[estado] || estado;
+  }
 }

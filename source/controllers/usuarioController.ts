@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/custom.error";
-import { PrismaClient, RoleNombre } from "../../generated/prisma";
+import { PrismaClient, RoleNombre, TipoNotificacion } from "../../generated/prisma";
 import passport from "passport";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../config/authUtils";
+import { NotificacionController } from "./notificacionController";
 
 export class UsuarioController {
   prisma = new PrismaClient();
@@ -154,6 +155,19 @@ export class UsuarioController {
           where: { id: usuario.id },
           data: { ultimoiniciosesion: new Date() }
         }).catch(console.error);
+
+        // Generar notificación de inicio de sesión (asíncrono, no bloquea la respuesta)
+        NotificacionController.crearNotificacion(
+          this.prisma,
+          {
+            tipo: TipoNotificacion.INICIO_SESION,
+            idusuariodestino: usuario.id,
+            idusuarioorigen: null,
+            idtiquete: null,
+            titulo: 'Inicio de sesión exitoso',
+            contenido: `Has iniciado sesión correctamente en HelpyIT el ${new Date().toLocaleString('es-ES')}.`
+          }
+        ).catch(console.error);
 
         return res.json({
           success: true,

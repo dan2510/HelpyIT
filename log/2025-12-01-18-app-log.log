@@ -1,0 +1,3 @@
+2025-12-01 18:06:15.725 error: 	Daniel Carballo--Se produjo un error interno del servidor Cannot find module 'C:\appHelpyIT\server\source\controllers\notificacionController.js' imported from C:\appHelpyIT\server\source\controllers\tiqueteController.ts
+2025-12-01 18:06:23.924 error: 	Daniel Carballo--Para agregar solo observación sin cambiar estado, use el endpoint de comentarios Para agregar solo observación sin cambiar estado, use el endpoint de comentarios
+2025-12-01 18:07:00.877 error: 	Daniel Carballo--Se produjo un error interno del servidor Cannot find module 'C:\appHelpyIT\server\source\controllers\notificacionController.js' imported from C:\appHelpyIT\server\source\controllers\tiqueteController.ts
