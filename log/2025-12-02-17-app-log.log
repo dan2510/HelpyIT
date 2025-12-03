@@ -1,0 +1,66 @@
+2025-12-02 17:25:11.641 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\config\passport.ts:35:43
+
+  32 },
+  33 async (correo, password, done) => {
+  34   try {
+→ 35     const user = await prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
+2025-12-02 17:25:44.144 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\config\passport.ts:35:43
+
+  32 },
+  33 async (correo, password, done) => {
+  34   try {
+→ 35     const user = await prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
+2025-12-02 17:26:16.216 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\config\passport.ts:35:43
+
+  32 },
+  33 async (correo, password, done) => {
+  34   try {
+→ 35     const user = await prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
+2025-12-02 17:26:43.141 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\config\passport.ts:35:43
+
+  32 },
+  33 async (correo, password, done) => {
+  34   try {
+→ 35     const user = await prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
+2025-12-02 17:27:41.403 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\config\passport.ts:35:43
+
+  32 },
+  33 async (correo, password, done) => {
+  34   try {
+→ 35     const user = await prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
+2025-12-02 17:28:45.837 error: 	Daniel Carballo--Se produjo un error interno del servidor 
+Invalid `prisma.usuario.findUnique()` invocation in
+C:\appHelpyIT\server\source\config\passport.ts:35:43
+
+  32 },
+  33 async (correo, password, done) => {
+  34   try {
+→ 35     const user = await prisma.usuario.findUnique(
+Can't reach database server at `localhost:3306`
+
+Please make sure your database server is running at `localhost:3306`.
