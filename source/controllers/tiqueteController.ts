@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { AppError } from "../errors/custom.error";
 import { PrismaClient, RoleNombre, EstadoTiquete, TipoHistorial, TipoNotificacion } from "../../generated/prisma";
 import { NotificacionController } from "./notificacionController";
+import { AsignacionController } from "./asignacionController";
 
 export class TiqueteController {
   prisma = new PrismaClient();
@@ -585,6 +586,22 @@ export class TiqueteController {
         }
       });
 
+      // Intentar asignación automática del ticket
+      let asignacionAutomatica = null;
+      try {
+        const asignacionController = new AsignacionController();
+        asignacionAutomatica = await asignacionController.asignarTicketAutomatico(nuevoTicket.id, idcliente);
+        
+        if (asignacionAutomatica.asignado) {
+          console.log(`✅ Ticket #${nuevoTicket.id} asignado automáticamente a ${asignacionAutomatica.tecnico?.nombrecompleto}`);
+        } else {
+          console.log(`⚠️ No se pudo asignar automáticamente el ticket #${nuevoTicket.id}: ${asignacionAutomatica.error}`);
+        }
+      } catch (error) {
+        console.error('Error al intentar asignación automática:', error);
+        // No fallar la creación del ticket si falla la asignación automática
+      }
+
       // Generar notificaciones para administradores sobre el nuevo ticket
       try {
         const administradores = await this.prisma.usuario.findMany({
@@ -608,7 +625,7 @@ export class TiqueteController {
               idusuarioorigen: idcliente,
               idtiquete: nuevoTicket.id,
               titulo: 'Nuevo ticket creado',
-              contenido: `Se ha creado un nuevo ticket: "${nuevoTicket.titulo}" por ${nuevoTicket.cliente.nombrecompleto}. Prioridad: ${prioridad}.`
+              contenido: `Se ha creado un nuevo ticket: "${nuevoTicket.titulo}" por ${nuevoTicket.cliente.nombrecompleto}. Prioridad: ${prioridad}.${asignacionAutomatica?.asignado ? ` Asignado automáticamente a ${asignacionAutomatica.tecnico?.nombrecompleto}.` : ''}`
             }
           );
         }
@@ -617,11 +634,43 @@ export class TiqueteController {
         // No fallar la creación del ticket si falla la notificación
       }
 
+      // Recargar el ticket con la información actualizada (por si se asignó)
+      const ticketActualizado = await this.prisma.tiquete.findUnique({
+        where: { id: nuevoTicket.id },
+        include: {
+          categoria: {
+            include: {
+              politicaSla: true
+            }
+          },
+          cliente: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true
+            }
+          },
+          tecnicoActual: {
+            select: {
+              id: true,
+              nombrecompleto: true,
+              correo: true
+            }
+          }
+        }
+      });
+
       response.status(201).json({
         success: true,
-        message: 'Ticket creado exitosamente',
+        message: asignacionAutomatica?.asignado 
+          ? 'Ticket creado y asignado automáticamente' 
+          : 'Ticket creado exitosamente',
         data: {
-          tiquete: nuevoTicket
+          tiquete: ticketActualizado,
+          asignacionAutomatica: asignacionAutomatica?.asignado ? {
+            tecnico: asignacionAutomatica.tecnico,
+            justificacion: asignacionAutomatica.justificacion
+          } : null
         }
       });
     } catch (error: any) {
