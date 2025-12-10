@@ -292,17 +292,22 @@ export class AsignacionController {
           ? (tecnico.cargaactual / tecnico.maxticketsimultaneos) * 100
           : 100;
 
-        // Calcular puntaje base del ticket
+        // Calcular puntaje base del ticket (solo urgencia, sin bonus de carga)
         const puntajeTicket = this.calcularPuntajePrioridad(ticket.prioridad, tiempoRestanteSLA);
 
-        // Ajustar puntaje según carga del técnico (menor carga = mejor)
-        const factorCarga = 100 - cargaPorcentaje; // Invertir: menor carga = mayor factor
-        const puntajeFinal = puntajeTicket + (factorCarga * 10); // Añadir bonus por disponibilidad
-
-        // Verificar disponibilidad
+        // Verificar disponibilidad y carga
+        // Excluir técnicos ocupados al máximo (a menos que sea crítico)
         const disponible = tecnico.disponibilidad === Disponibilidad.DISPONIBLE;
-        if (!disponible && cargaPorcentaje >= 100) {
-          return null; // No considerar técnicos ocupados al máximo
+        const esCritico = ticket.prioridad === Prioridad.CRITICA;
+        
+        // No considerar técnicos ocupados al máximo, excepto si el ticket es crítico
+        if (!disponible && cargaPorcentaje >= 100 && !esCritico) {
+          return null;
+        }
+        
+        // Si está al 100% y no es crítico, no asignar
+        if (cargaPorcentaje >= 100 && !esCritico) {
+          return null;
         }
 
         // Obtener nombre de la especialidad coincidente
@@ -319,16 +324,25 @@ export class AsignacionController {
 
         return {
           tecnico,
-          puntaje: puntajeFinal,
+          puntaje: puntajeTicket, // Usar solo el puntaje del ticket, sin bonus
+          cargaPorcentaje, // Incluir carga para desempate
           justificacion
         };
       })
     );
 
-    // Filtrar nulos y ordenar por puntaje descendente
+    // Filtrar nulos y ordenar
+    // Primero por puntaje del ticket (descendente), luego por carga (ascendente) como desempate
     const tecnicosValidos = tecnicosConPuntaje
-      .filter((t): t is { tecnico: any; puntaje: number; justificacion: string } => t !== null)
-      .sort((a, b) => b.puntaje - a.puntaje);
+      .filter((t): t is { tecnico: any; puntaje: number; cargaPorcentaje: number; justificacion: string } => t !== null)
+      .sort((a, b) => {
+        // Primero ordenar por puntaje (mayor primero)
+        if (b.puntaje !== a.puntaje) {
+          return b.puntaje - a.puntaje;
+        }
+        // Si hay empate, ordenar por carga (menor primero)
+        return a.cargaPorcentaje - b.cargaPorcentaje;
+      });
 
     if (tecnicosValidos.length === 0) {
       console.log('⚠️ No se encontraron técnicos válidos para asignar');
