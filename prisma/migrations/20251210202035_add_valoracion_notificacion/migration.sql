@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE `notificacion` MODIFY `tipo` ENUM('ASIGNACION', 'CAMBIO_ESTADO', 'MENSAJE', 'RECORDATORIO', 'INICIO_SESION', 'VALORACION') NOT NULL;
+
+-- AlterTable
+ALTER TABLE `usuario` ADD COLUMN `resettoken` VARCHAR(255) NULL,
+    ADD COLUMN `resettokenexpires` DATETIME(3) NULL;
