@@ -39,6 +39,8 @@ model Usuario {
   disponibilidad         Disponibilidad @default(DISPONIBLE)
   cargaactual            Int      @default(0)
   maxticketsimultaneos   Int      @default(5)
+  resettoken             String?  @db.VarChar(255)
+  resettokenexpires      DateTime?
   
   // Relaciones
   rol                    Rol      @relation(fields: [idrol], references: [id])

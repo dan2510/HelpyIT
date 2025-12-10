@@ -1148,13 +1148,26 @@ export class TiqueteController {
         return next(AppError.badRequest(`Estado inválido. Estados válidos: ${estadosValidos.join(', ')}`));
       }
 
+      // Obtener el rol del usuario autenticado
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioAutenticado.id },
+        include: { rol: true }
+      });
+
+      if (!usuario) {
+        return next(AppError.notFound("Usuario no encontrado"));
+      }
+
+      const rolUsuario = usuario.rol.nombre;
+      const esCliente = rolUsuario === RoleNombre.CLIENTE;
+
       // Validar que se proporcionó una observación
       if (!observacion || observacion.trim().length === 0) {
         return next(AppError.badRequest("La observación es obligatoria para cambiar el estado"));
       }
 
-      // Validar que se proporcionó al menos una imagen
-      if (!imagenes || !Array.isArray(imagenes) || imagenes.length === 0) {
+      // Validar imágenes: obligatorias para ADMIN/TECNICO, opcionales para CLIENTE
+      if (!esCliente && (!imagenes || !Array.isArray(imagenes) || imagenes.length === 0)) {
         return next(AppError.badRequest("Se requiere al menos una imagen como evidencia"));
       }
 
@@ -1193,21 +1206,34 @@ export class TiqueteController {
         return next(AppError.badRequest("Para agregar solo observación sin cambiar estado, use el endpoint de comentarios"));
       }
 
-      // Definir el flujo válido de estados (avanzar)
-      const flujoValido: { [key in EstadoTiquete]?: EstadoTiquete[] } = {
-        [EstadoTiquete.PENDIENTE]: [EstadoTiquete.ASIGNADO],
-        [EstadoTiquete.ASIGNADO]: [EstadoTiquete.EN_PROGRESO],
-        [EstadoTiquete.EN_PROGRESO]: [EstadoTiquete.RESUELTO],
-        [EstadoTiquete.RESUELTO]: [EstadoTiquete.CERRADO]
-      };
+      // Definir el flujo válido de estados según el rol
+      let flujoValido: { [key in EstadoTiquete]?: EstadoTiquete[] };
+      let flujoRetroceso: { [key in EstadoTiquete]?: EstadoTiquete };
 
-      // Definir el flujo válido para retroceder (un paso atrás)
-      const flujoRetroceso: { [key in EstadoTiquete]?: EstadoTiquete } = {
-        [EstadoTiquete.ASIGNADO]: EstadoTiquete.PENDIENTE,
-        [EstadoTiquete.EN_PROGRESO]: EstadoTiquete.ASIGNADO,
-        [EstadoTiquete.RESUELTO]: EstadoTiquete.EN_PROGRESO,
-        [EstadoTiquete.CERRADO]: EstadoTiquete.RESUELTO
-      };
+      if (esCliente) {
+        // Cliente solo puede resolver y cerrar
+        flujoValido = {
+          [EstadoTiquete.EN_PROGRESO]: [EstadoTiquete.RESUELTO],
+          [EstadoTiquete.RESUELTO]: [EstadoTiquete.CERRADO]
+        };
+        // Cliente no puede retroceder
+        flujoRetroceso = {};
+      } else {
+        // ADMIN y TECNICO: flujo completo
+        flujoValido = {
+          [EstadoTiquete.PENDIENTE]: [EstadoTiquete.ASIGNADO],
+          [EstadoTiquete.ASIGNADO]: [EstadoTiquete.EN_PROGRESO],
+          [EstadoTiquete.EN_PROGRESO]: [EstadoTiquete.RESUELTO],
+          [EstadoTiquete.RESUELTO]: [EstadoTiquete.CERRADO]
+        };
+        // Definir el flujo válido para retroceder (un paso atrás)
+        flujoRetroceso = {
+          [EstadoTiquete.ASIGNADO]: EstadoTiquete.PENDIENTE,
+          [EstadoTiquete.EN_PROGRESO]: EstadoTiquete.ASIGNADO,
+          [EstadoTiquete.RESUELTO]: EstadoTiquete.EN_PROGRESO,
+          [EstadoTiquete.CERRADO]: EstadoTiquete.RESUELTO
+        };
+      }
 
       // Verificar si es un retroceso válido
       const estadoRetroceso = flujoRetroceso[estadoAnterior];
@@ -1227,11 +1253,26 @@ export class TiqueteController {
       }
 
       // Validar que no se puede avanzar sin técnico asignado (excepto desde Pendiente o retrocediendo)
-      if (!esRetrocesoValido && estadoAnterior !== EstadoTiquete.PENDIENTE && !tiqueteExistente.idtecnicoactual) {
+      // Cliente puede resolver/cerrar sin esta validación
+      if (!esCliente && !esRetrocesoValido && estadoAnterior !== EstadoTiquete.PENDIENTE && !tiqueteExistente.idtecnicoactual) {
         return next(AppError.badRequest(
           "No se puede avanzar el estado sin un técnico asignado. " +
           "Solo se puede avanzar desde 'Pendiente' sin técnico asignado."
         ));
+      }
+
+      // Validar que el cliente solo puede cambiar estados permitidos
+      if (esCliente) {
+        if (estadoAnterior !== EstadoTiquete.EN_PROGRESO && estadoAnterior !== EstadoTiquete.RESUELTO) {
+          return next(AppError.forbidden(
+            "Los clientes solo pueden resolver tickets en estado 'En Progreso' o cerrar tickets 'Resueltos'"
+          ));
+        }
+        
+        // Verificar que el ticket pertenece al cliente
+        if (tiqueteExistente.idcliente !== usuarioAutenticado.id) {
+          return next(AppError.forbidden("Solo puedes actualizar tus propios tickets"));
+        }
       }
 
       // Preparar datos de actualización
@@ -1344,13 +1385,14 @@ export class TiqueteController {
           observacion: observacion.trim(),
           cambiadopor: usuarioAutenticado.id,
           cambiadoen: ahora,
-          imagenes: {
+          // Las imágenes son opcionales para clientes
+          imagenes: (imagenes && Array.isArray(imagenes) && imagenes.length > 0) ? {
             create: imagenes.map((nombreArchivo: string) => ({
               rutaarchivo: nombreArchivo,
               subidopor: usuarioAutenticado.id,
               subidoen: ahora
             }))
-          }
+          } : undefined
         },
         include: {
           usuarioCambio: {

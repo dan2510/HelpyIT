@@ -204,4 +204,89 @@ export class UsuarioController {
       next(error);
     }
   };
+
+  // Token fijo para restablecimiento de contraseña (configurado por administrador)
+  private readonly RESET_TOKEN = process.env.RESET_PASSWORD_TOKEN || '12345';
+
+  // SOLICITAR RESTABLECIMIENTO DE CONTRASEÑA
+  forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { correo } = req.body;
+
+      if (!correo) {
+        return next(AppError.badRequest("El correo es requerido"));
+      }
+
+      // Buscar usuario por correo
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { correo: correo.toLowerCase().trim() }
+      });
+
+      // Si el usuario no existe, devolver error
+      if (!usuario) {
+        return res.status(404).json({
+          success: false,
+          message: "El correo no existe en nuestro sistema"
+        });
+      }
+
+      // Si el usuario existe, devolver éxito
+      res.json({
+        success: true,
+        message: "Correo verificado. Ingresa el token de restablecimiento"
+      });
+    } catch (error) {
+      console.error('Error en forgotPassword:', error);
+      next(error);
+    }
+  };
+
+  // RESTABLECER CONTRASEÑA
+  resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token, correo, password } = req.body;
+
+      if (!token || !correo || !password) {
+        return next(AppError.badRequest("Token, correo y contraseña son requeridos"));
+      }
+
+      // Validar token fijo
+      if (token !== this.RESET_TOKEN) {
+        return next(AppError.badRequest("Token inválido. Contacta al administrador para obtener el token correcto"));
+      }
+
+      if (password.length < 6) {
+        return next(AppError.badRequest("La contraseña debe tener al menos 6 caracteres"));
+      }
+
+      // Buscar usuario por correo
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { correo: correo.toLowerCase().trim() }
+      });
+
+      if (!usuario) {
+        return next(AppError.badRequest("Usuario no encontrado"));
+      }
+
+      // Hash de la nueva contraseña
+      const salt = await bcrypt.genSalt(10);
+      const hash = await bcrypt.hash(password, salt);
+
+      // Actualizar contraseña
+      await this.prisma.usuario.update({
+        where: { id: usuario.id },
+        data: {
+          contrasenahash: hash
+        }
+      });
+
+      res.json({
+        success: true,
+        message: "Contraseña restablecida exitosamente"
+      });
+    } catch (error) {
+      console.error('Error en resetPassword:', error);
+      next(error);
+    }
+  };
 }

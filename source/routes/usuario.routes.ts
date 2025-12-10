@@ -13,6 +13,12 @@ export class UsuarioRoutes {
     // POST /api/usuario/register - Registro de nuevo usuario (solo clientes)
     router.post("/register", controller.register);
     
+    // POST /api/usuario/forgot-password - Solicitar restablecimiento de contraseña
+    router.post("/forgot-password", controller.forgotPassword);
+    
+    // POST /api/usuario/reset-password - Restablecer contraseña con token
+    router.post("/reset-password", controller.resetPassword);
+    
     // GET /api/usuario/profile - Obtener perfil del usuario autenticado
     router.get("/profile", authenticateJWT, controller.userAuth);
 
