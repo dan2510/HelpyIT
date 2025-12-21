@@ -32,10 +32,10 @@ export class NotificacionController {
               correo: true
             }
           },
-          tiquete: {
+          orden: {
             select: {
               id: true,
-              titulo: true,
+              numeropedido: true,
               estado: true
             }
           }
@@ -109,10 +109,10 @@ export class NotificacionController {
               correo: true
             }
           },
-          tiquete: {
+          orden: {
             select: {
               id: true,
-              titulo: true,
+              numeropedido: true,
               estado: true
             }
           }
@@ -163,6 +163,35 @@ export class NotificacionController {
     }
   };
 
+  // Método para crear una notificación (usado por otros controladores)
+  async create(data: {
+    tipo: TipoNotificacion;
+    idusuariodestino: number;
+    idusuarioorigen?: number | null;
+    idorden?: number | null;
+    titulo: string;
+    contenido: string;
+  }): Promise<void> {
+    try {
+      const notificacion = await prisma.notificacion.create({
+        data: {
+          tipo: data.tipo,
+          idusuariodestino: data.idusuariodestino,
+          idusuarioorigen: data.idusuarioorigen || null,
+          idorden: data.idorden || null,
+          titulo: data.titulo,
+          contenido: data.contenido,
+          estado: EstadoNotificacion.NO_LEIDA
+        }
+      });
+      console.log(`✅ Notificación creada exitosamente: ID=${notificacion.id}, Tipo=${data.tipo}, Destino=${data.idusuariodestino}, Título="${data.titulo}"`);
+    } catch (error: any) {
+      console.error('❌ Error al crear notificación:', error);
+      console.error('   Datos intentados:', JSON.stringify(data, null, 2));
+      // No lanzar error para no interrumpir el flujo principal
+    }
+  }
+
   // Método estático para crear una notificación (usado por otros controladores)
   static async crearNotificacion(
     prisma: PrismaClient,
@@ -170,7 +199,7 @@ export class NotificacionController {
       tipo: TipoNotificacion;
       idusuariodestino: number;
       idusuarioorigen?: number | null;
-      idtiquete?: number | null;
+      idorden?: number | null;
       titulo: string;
       contenido: string;
     }
@@ -181,7 +210,7 @@ export class NotificacionController {
           tipo: data.tipo,
           idusuariodestino: data.idusuariodestino,
           idusuarioorigen: data.idusuarioorigen || null,
-          idtiquete: data.idtiquete || null,
+          idorden: data.idorden || null,
           titulo: data.titulo,
           contenido: data.contenido,
           estado: EstadoNotificacion.NO_LEIDA

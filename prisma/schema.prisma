@@ -14,284 +14,223 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 // Modelos principales
 model Rol {
-  id          Int         @id @default(autoincrement())
+  id          Int        @id @default(autoincrement())
   nombre      RoleNombre
-  descripcion String      @db.VarChar(255)
+  descripcion String     @db.VarChar(255)
   usuarios    Usuario[]
-  
 }
 
 model Usuario {
-  id                     Int      @id @default(autoincrement())
-  correo                 String   @unique @db.VarChar(190)
-  contrasenahash         String   @db.VarChar(255)
-  nombrecompleto         String   @db.VarChar(120)
-  telefono               String?  @db.VarChar(20)
-  idrol                  Int
-  activo                 Boolean  @default(true) @db.TinyInt
-  ultimoiniciosesion     DateTime?
-  creadoen               DateTime @default(now())
-  actualizadoen          DateTime @default(now()) @updatedAt
-  eliminadoen            DateTime? 
-  disponibilidad         Disponibilidad @default(DISPONIBLE)
-  cargaactual            Int      @default(0)
-  maxticketsimultaneos   Int      @default(5)
-  resettoken             String?  @db.VarChar(255)
-  resettokenexpires      DateTime?
-  
+  id                 Int            @id @default(autoincrement())
+  correo             String?        @unique @db.VarChar(190) // Opcional para clientes que solo usan teléfono
+  contrasenahash     String?        @db.VarChar(255) // Opcional para clientes sin cuenta
+  nombrecompleto     String         @db.VarChar(120)
+  telefono           String?        @unique @db.VarChar(20) // Único para identificar clientes
+  direccion          String?        @db.Text // Dirección del cliente
+  latitud            Decimal?       @db.Decimal(10, 8) // Coordenada GPS
+  longitud           Decimal?       @db.Decimal(11, 8) // Coordenada GPS
+  idrol              Int
+  activo             Boolean        @default(true) @db.TinyInt
+  ultimoiniciosesion DateTime?
+  ultimopedido       DateTime? // Fecha del último pedido
+  creadoen           DateTime       @default(now())
+  actualizadoen      DateTime       @default(now()) @updatedAt
+  eliminadoen        DateTime?
+  disponibilidad     Disponibilidad @default(DISPONIBLE)
+  resettoken         String?        @db.VarChar(255)
+  resettokenexpires  DateTime?
+
   // Relaciones
-  rol                    Rol      @relation(fields: [idrol], references: [id])
-  tiquetesComoCliente    Tiquete[] @relation("ClienteTiquetes")
-  tiquetesComoTecnico    Tiquete[] @relation("TecnicoTiquetes")
-  especialidades         UsuarioEspecialidad[]
-  asignaciones           AsignacionTiquete[]
-  historialesCreados     HistorialTiquete[]
-  imagenesSubidas        ImagenTiquete[]
-  notificacionesDestino  Notificacion[] @relation("NotificacionDestino")
-  notificacionesOrigen   Notificacion[] @relation("NotificacionOrigen")
-  valoracionesCliente    ValoracionServicio[]
-  
+  rol                   Rol               @relation(fields: [idrol], references: [id])
+  ordenesComoCliente    Orden[]           @relation("ClienteOrdenes")
+  notificacionesDestino Notificacion[]    @relation("NotificacionDestino")
+  notificacionesOrigen  Notificacion[]    @relation("NotificacionOrigen")
+  valoracionesCliente   ValoracionOrden[]
+  imagenesSubidas       ImagenOrden[]
+  historialesCreados    HistorialOrden[]
 }
 
-model Categoria {
-  id           Int      @id @default(autoincrement())
-  nombre       String   @db.VarChar(80)
-  descripcion  String   @db.VarChar(255)
-  idsla        Int
-  activo       Boolean  @default(true) @db.TinyInt
-  
+model CategoriaMenu {
+  id            Int      @id @default(autoincrement())
+  nombre        String   @db.VarChar(80)
+  descripcion   String   @db.VarChar(255)
+  activo        Boolean  @default(true) @db.TinyInt
+  orden         Int      @default(0) // Para ordenar las categorías en el menú
+  creadoen      DateTime @default(now())
+  actualizadoen DateTime @default(now()) @updatedAt
+
   // Relaciones
-  politicaSla  PoliticaSla @relation(fields: [idsla], references: [id])
-  tiquetes     Tiquete[]
-  especialidades CategoriaEspecialidad[]
-  etiquetas    CategoriaEtiqueta[]
-  
- 
+  itemsMenu MenuItem[]
 }
 
-model Especialidad {
-  id          Int      @id @default(autoincrement()) 
-  nombre      String   @db.VarChar(80)
-  descripcion String   @db.VarChar(255)
-  activo      Boolean  @default(true) @db.TinyInt
-  
-  // Relaciones
-  usuarios    UsuarioEspecialidad[]
-  categorias  CategoriaEspecialidad[]
-  
+model MenuItem {
+  id                Int      @id @default(autoincrement())
+  nombre            String   @db.VarChar(120)
+  descripcion       String?  @db.Text
+  precio            Decimal  @db.Decimal(10, 2) // Precio base o precio si no tiene variantes
+  idcategoria       Int
+  activo            Boolean  @default(true) @db.TinyInt
+  disponible        Boolean  @default(true) @db.TinyInt
+  imagen            String?  @db.VarChar(500)
+  tiempoPreparacion Int? // Tiempo estimado en minutos
+  tieneVariantes    Boolean  @default(false) @db.TinyInt // Si el producto tiene variantes obligatorias
+  precioVariable    Boolean  @default(false) @db.TinyInt // Si el precio cambia según la variante seleccionada
+  creadoen          DateTime @default(now())
+  actualizadoen     DateTime @default(now()) @updatedAt
 
+  // Relaciones
+  categoria  CategoriaMenu @relation(fields: [idcategoria], references: [id])
+  itemsOrden ItemOrden[]
+  gruposVariantes GrupoVariante[]
 }
 
-model Etiqueta {
-  id          Int      @id @default(autoincrement())
-  nombre      String   @db.VarChar(60)
-  descripcion String   @db.VarChar(255)
-  
-  // Relaciones
-  categorias  CategoriaEtiqueta[]
-  
+model Orden {
+  id                 Int         @id @default(autoincrement())
+  numeropedido       String      @unique @db.VarChar(50) // Número único de pedido (aumentado para formato ORD-YYYYMMDD-XXX)
+  idcliente          Int
+  estado             EstadoOrden @default(PENDIENTE)
+  tipopedido         TipoPedido  @default(COMER_AQUI) // Comer aquí o para llevar
+  total              Decimal     @default(0) @db.Decimal(10, 2)
+  subtotal           Decimal     @default(0) @db.Decimal(10, 2) // Subtotal antes de servicios
+  servicioexpress    Decimal?    @db.Decimal(10, 2) // Costo de servicio express si aplica
+  metodopago         MetodoPago? // Método de pago seleccionado
+  montopagado        Decimal?    @db.Decimal(10, 2) // Monto recibido (para efectivo)
+  cambio             Decimal?    @db.Decimal(10, 2) // Cambio a devolver (para efectivo)
+  numeroautorizacion String?     @db.VarChar(50) // Número de autorización para tarjeta
+  ultimos4digitos    String?     @db.VarChar(4) // Últimos 4 dígitos de tarjeta
+  notas              String?     @db.Text // Notas especiales del cliente
+  tiempoestimado     Int? // Tiempo estimado en minutos
+  creadoen           DateTime    @default(now())
+  actualizadoen      DateTime    @default(now()) @updatedAt
+  preparadoen        DateTime? // Cuando se marca como listo
+  entregadoen        DateTime? // Cuando se entrega al cliente
 
+  // Relaciones
+  cliente        Usuario           @relation("ClienteOrdenes", fields: [idcliente], references: [id])
+  items          ItemOrden[]
+  historiales    HistorialOrden[]
+  notificaciones Notificacion[]
+  valoraciones   ValoracionOrden[]
 }
 
-model PoliticaSla {
-  id                    Int      @id @default(autoincrement())
-  nombre                String   @db.VarChar(100)
-  descripcion           String   @db.VarChar(255)
-  maxminutosrespuesta   Int      
-  maxminutosresolucion  Int      
-  activo                Boolean  @default(true) @db.TinyInt
-  vigentedesde          DateTime @db.Date
-  vigentehasta          DateTime @db.Date
-  creadoen              DateTime @default(now())
-  actualizadoen         DateTime @default(now())
-  
+model ItemOrden {
+  id         Int      @id @default(autoincrement())
+  idorden    Int
+  idmenuitem Int
+  cantidad   Int      @default(1)
+  precio     Decimal  @db.Decimal(10, 2) // Precio al momento de la orden
+  subtotal   Decimal  @db.Decimal(10, 2)
+  notas      String?  @db.VarChar(500) // Notas específicas del item
+  creadoen   DateTime @default(now())
+
   // Relaciones
-  categorias            Categoria[]
-  
+  orden    Orden    @relation(fields: [idorden], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [idmenuitem], references: [id])
 }
 
-model ReglaAsignacion {
-  id                   Int      @id @default(autoincrement())
-  nombre               String   @db.VarChar(100)
-  descripcion          String   @db.VarChar(255)
-  activa               Boolean  @default(true) @db.TinyInt
-  pesoprioridad        Int     
-  pesoslarestante      Int      
-  pesocargaactual      Int      
-  pesoexperiencia      Int     
-  prioridadejecucion   Int     
-  creadoen             DateTime @default(now())
-  actualizadoen        DateTime @default(now()) @updatedAt
-  eliminadoen          DateTime?
-  
-  // Relaciones
-  asignaciones         AsignacionTiquete[]
-  
- 
-}
-
-model Tiquete {
-  id                     Int      @id @default(autoincrement())
-  titulo                 String   @db.VarChar(140)
-  descripcion            String   @db.Text
-  prioridad              Prioridad @default(MEDIA)
-  estado                 EstadoTiquete @default(PENDIENTE)
-  idcategoria            Int
-  idcliente              Int
-  idtecnicoactual        Int?
-  creadoen               DateTime @default(now())
-  primerarespuestaen     DateTime? 
-  resueltoen             DateTime? 
-  cerradoen              DateTime?
-  vencerespuesta         DateTime 
-  venceresolucion        DateTime 
-  cumplioslarespuesta    Boolean? 
-  cumplioslaresolucion   Boolean?
-  
-  // Relaciones
-  categoria              Categoria @relation(fields: [idcategoria], references: [id])
-  cliente                Usuario @relation("ClienteTiquetes", fields: [idcliente], references: [id])
-  tecnicoActual          Usuario? @relation("TecnicoTiquetes", fields: [idtecnicoactual], references: [id])
-  asignaciones           AsignacionTiquete[]
-  historiales            HistorialTiquete[]
-  notificaciones         Notificacion[]
-  valoraciones           ValoracionServicio[]
-  
-
-}
-
-model AsignacionTiquete {
-  idasignacion       Int      @id @default(autoincrement())
-  idtiquete          Int
-  idtecnico          Int
-  idregla            Int?
-  metodo             MetodoAsignacion @default(MANUAL)
-  justificacion      String?  @db.Text
-  puntajeasignacion  Int?     
-  asignadopor        Int     
-  asignadoen         DateTime @default(now())
-  
-  // Relaciones
-  tiquete            Tiquete @relation(fields: [idtiquete], references: [id])
-  tecnico            Usuario @relation(fields: [idtecnico], references: [id])
-  regla              ReglaAsignacion? @relation(fields: [idregla], references: [id])
-  
-
-}
-
-model HistorialTiquete {
-  id             Int      @id @default(autoincrement())
-  idtiquete      Int
-  estadoanterior EstadoTiquete? 
-  estadonuevo    EstadoTiquete? 
-  observacion    String?  @db.Text
+model HistorialOrden {
+  id             Int           @id @default(autoincrement())
+  idorden        Int
+  estadoanterior EstadoOrden?
+  estadonuevo    EstadoOrden?
+  observacion    String?       @db.Text
   tipo           TipoHistorial @default(CAMBIO_ESTADO)
-  cambiadopor    Int     
-  cambiadoen     DateTime @default(now())
-  
-  // Relaciones
-  tiquete        Tiquete @relation(fields: [idtiquete], references: [id])
-  usuarioCambio  Usuario @relation(fields: [cambiadopor], references: [id])
-  imagenes       ImagenTiquete[]
-  
+  cambiadopor    Int
+  cambiadoen     DateTime      @default(now())
 
+  // Relaciones
+  orden         Orden         @relation(fields: [idorden], references: [id], onDelete: Cascade)
+  usuarioCambio Usuario       @relation(fields: [cambiadopor], references: [id])
+  imagenes      ImagenOrden[]
 }
 
-model ImagenTiquete {
-  id           Int      @id @default(autoincrement())
-  idhistorial  Int
-  rutaarchivo  String   @db.VarChar(500)
-  subidopor    Int      
-  subidoen     DateTime @default(now())
-  
-  // Relaciones
-  historial    HistorialTiquete @relation(fields: [idhistorial], references: [id])
-  usuario      Usuario @relation(fields: [subidopor], references: [id])
-  
+model ImagenOrden {
+  id          Int      @id @default(autoincrement())
+  idhistorial Int
+  rutaarchivo String   @db.VarChar(500)
+  subidopor   Int
+  subidoen    DateTime @default(now())
 
+  // Relaciones
+  historial HistorialOrden @relation(fields: [idhistorial], references: [id], onDelete: Cascade)
+  usuario   Usuario        @relation(fields: [subidopor], references: [id])
 }
 
 model Notificacion {
-  id              Int      @id @default(autoincrement()) 
-  tipo            TipoNotificacion
-  idusuariodestino Int     
-  idusuarioorigen Int?    
-  idtiquete       Int?
-  titulo          String   @db.VarChar(200)
-  contenido       String   @db.Text
-  estado          EstadoNotificacion @default(NO_LEIDA)
-  creadaen        DateTime @default(now()) 
-  leidaen         DateTime?
-  
-  // Relaciones
-  usuarioDestino  Usuario @relation("NotificacionDestino", fields: [idusuariodestino], references: [id])
-  usuarioOrigen   Usuario? @relation("NotificacionOrigen", fields: [idusuarioorigen], references: [id])
-  tiquete         Tiquete? @relation(fields: [idtiquete], references: [id])
-  
+  id               Int                @id @default(autoincrement())
+  tipo             TipoNotificacion
+  idusuariodestino Int
+  idusuarioorigen  Int?
+  idorden          Int?
+  titulo           String             @db.VarChar(200)
+  contenido        String             @db.Text
+  estado           EstadoNotificacion @default(NO_LEIDA)
+  creadaen         DateTime           @default(now())
+  leidaen          DateTime?
 
+  // Relaciones
+  usuarioDestino Usuario  @relation("NotificacionDestino", fields: [idusuariodestino], references: [id])
+  usuarioOrigen  Usuario? @relation("NotificacionOrigen", fields: [idusuarioorigen], references: [id])
+  orden          Orden?   @relation(fields: [idorden], references: [id])
 }
 
-model ValoracionServicio {
+model ValoracionOrden {
   id           Int      @id @default(autoincrement())
-  idtiquete    Int
+  idorden      Int
   idcliente    Int
   calificacion Int
   comentario   String?  @db.VarChar(500)
   creadaen     DateTime @default(now())
-  
-  // Relaciones
-  tiquete      Tiquete @relation(fields: [idtiquete], references: [id])
-  cliente      Usuario @relation(fields: [idcliente], references: [id])
-  
 
+  // Relaciones
+  orden   Orden   @relation(fields: [idorden], references: [id])
+  cliente Usuario @relation(fields: [idcliente], references: [id])
 }
 
-// Tablas de relación many-to-many
-model CategoriaEspecialidad {
-  idcategoria     Int
-  idespecialidad  Int
-  
-  // Relaciones
-  categoria       Categoria @relation(fields: [idcategoria], references: [id])
-  especialidad    Especialidad @relation(fields: [idespecialidad], references: [id])
-  
-  @@id([idcategoria, idespecialidad])
+// Sistema de Variantes
+model GrupoVariante {
+  id                Int      @id @default(autoincrement())
+  idmenuitem        Int
+  nombre            String   @db.VarChar(100) // Ej: "Selecciona tu Acompañamiento"
+  descripcion       String?  @db.VarChar(255)
+  obligatorio       Boolean  @default(true) @db.TinyInt
+  tipoSeleccion     String   @default("unica") @db.VarChar(20) // "unica" o "multiple"
+  orden             Int      @default(0) // Orden de visualización
+  definePrecioBase  Boolean  @default(false) @db.TinyInt // Si este grupo define el precio base
+  visibleSi         String?  @db.VarChar(100) // Condición para mostrar (JSON)
+  creadoen          DateTime @default(now())
+  actualizadoen     DateTime @default(now()) @updatedAt
 
+  // Relaciones
+  menuItem MenuItem @relation(fields: [idmenuitem], references: [id], onDelete: Cascade)
+  opciones OpcionVariante[]
 }
 
-model CategoriaEtiqueta {
-  idcategoria Int
-  idetiqueta  Int
-  
+model OpcionVariante {
+  id                Int      @id @default(autoincrement())
+  idgrupo           Int
+  nombre            String   @db.VarChar(100) // Ej: "Con papas o doraditas"
+  descripcion       String?  @db.VarChar(255)
+  precioBase        Decimal? @db.Decimal(10, 2) // Precio base si definePrecioBase es true
+  incrementoPrecio  Decimal  @default(0) @db.Decimal(10, 2) // Incremento al precio base
+  requiereSubSeleccion Boolean @default(false) @db.TinyInt // Si requiere sub-selección
+  subOpciones       String?  @db.Text // JSON con las sub-opciones disponibles
+  orden             Int      @default(0)
+  activo            Boolean  @default(true) @db.TinyInt
+  creadoen          DateTime @default(now())
+  actualizadoen     DateTime @default(now()) @updatedAt
+
   // Relaciones
-  categoria   Categoria @relation(fields: [idcategoria], references: [id])
-  etiqueta    Etiqueta @relation(fields: [idetiqueta], references: [id])
-  
-  @@id([idcategoria, idetiqueta])
- 
+  grupo GrupoVariante @relation(fields: [idgrupo], references: [id], onDelete: Cascade)
 }
 
-model UsuarioEspecialidad {
-  idusuario        Int
-  idespecialidad   Int
-  nivelexperiencia NivelExperiencia 
-  asignadoen       DateTime @default(now())
-  
-  // Relaciones
-  usuario          Usuario @relation(fields: [idusuario], references: [id])
-  especialidad     Especialidad @relation(fields: [idespecialidad], references: [id])
-  
-  @@id([idusuario, idespecialidad])
-
-}
+// Relación para que Usuario pueda subir imágenes
 
 // Enums
 enum RoleNombre {
   ADMIN
-  TECNICO
   CLIENTE
 }
 
@@ -302,24 +241,31 @@ enum Disponibilidad {
   INACTIVO
 }
 
-enum Prioridad {
-  BAJA
-  MEDIA
-  ALTA
-  CRITICA
+enum EstadoOrden {
+  PENDIENTE
+  RECIBIDO
+  EN_PREPARACION
+  LISTO
+  EN_CAMINO
+  ENTREGADO
+  CANCELADO
 }
 
-enum EstadoTiquete {
-  PENDIENTE
-  EN_PROGRESO
-  RESUELTO
-  CERRADO
-  CANCELADO
-  ASIGNADO
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+  SINPE_MOVIL
+}
+
+enum TipoPedido {
+  COMER_AQUI
+  PARA_LLEVAR
+  DELIVERY
 }
 
 enum TipoNotificacion {
-  ASIGNACION
+  NUEVA_ORDEN
+  ORDEN_LISTA
   CAMBIO_ESTADO
   MENSAJE
   RECORDATORIO
@@ -331,21 +277,18 @@ enum EstadoNotificacion {
   LEIDA
 }
 
-enum NivelExperiencia {
-  JUNIOR
-  INTERMEDIO
-  SENIOR
-  EXPERTO
-}
-
-enum MetodoAsignacion {
-  MANUAL
-  AUTOMATICO
-  REGLA
-}
-
 enum TipoHistorial {
   CAMBIO_ESTADO
-  COMENTARIO_EXTERNAL
-  COMENTARIO_INTERNAL
+  COMENTARIO_CLIENTE
+}
+
+// Configuración del sistema
+model Configuracion {
+  id                Int      @id @default(autoincrement())
+  clave             String   @unique @db.VarChar(100) // Clave única de la configuración
+  valor             String   @db.Text // Valor de la configuración (puede ser JSON)
+  descripcion       String?  @db.Text // Descripción de qué hace esta configuración
+  tipo              String   @default("string") @db.VarChar(50) // Tipo: string, number, boolean, json
+  creadoen          DateTime @default(now())
+  actualizadoen     DateTime @default(now()) @updatedAt
 }

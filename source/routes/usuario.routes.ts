@@ -25,6 +25,12 @@ export class UsuarioRoutes {
     // GET /api/usuario/clientes - Obtener todos los clientes (debe ir antes de /:id)
     router.get("/clientes", controller.getClientes);
     
+    // GET /api/usuario/buscar-telefono/:telefono - Buscar usuario por teléfono (para pedidos)
+    router.get("/buscar-telefono/:telefono", controller.buscarPorTelefono);
+    
+    // POST /api/usuario/cliente-temporal - Crear cliente temporal sin contraseña
+    router.post("/cliente-temporal", controller.crearClienteTemporal);
+    
     // GET /api/usuario/:id - Obtener información de usuario por ID
     router.get("/:id", controller.getById);
 

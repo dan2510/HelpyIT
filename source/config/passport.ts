@@ -32,22 +32,49 @@ passport.use(
     },
     async (correo, password, done) => {
       try {
+        console.log('🔑 [PASSPORT] Iniciando autenticación...');
+        console.log('🔑 [PASSPORT] Correo:', correo);
+        console.log('🔑 [PASSPORT] Buscando usuario en BD...');
+        
         const user = await prisma.usuario.findUnique({ 
           where: { correo },
           include: { rol: true }
         });
-        if (!user)
+        
+        console.log('🔑 [PASSPORT] Usuario encontrado:', user ? 'Sí' : 'No');
+        
+        if (!user) {
+          console.log('🔑 [PASSPORT] Usuario no registrado');
           return done(null, false, { message: "Usuario no registrado" });
+        }
 
-        if (!user.activo)
+        console.log('🔑 [PASSPORT] Usuario activo:', user.activo);
+        if (!user.activo) {
+          console.log('🔑 [PASSPORT] Usuario inactivo');
           return done(null, false, { message: "Usuario inactivo" });
+        }
 
+        // Verificar que el usuario tenga contraseña (clientes temporales no tienen)
+        if (!user.contrasenahash) {
+          console.log('🔑 [PASSPORT] Usuario sin contraseña (cliente temporal)');
+          return done(null, false, { message: "Este usuario no puede iniciar sesión con contraseña. Use el flujo de pedidos." });
+        }
+
+        console.log('🔑 [PASSPORT] Verificando contraseña...');
         const isMatch = await bcrypt.compare(password, user.contrasenahash);
-        if (!isMatch)
+        console.log('🔑 [PASSPORT] Contraseña válida:', isMatch);
+        
+        if (!isMatch) {
+          console.log('🔑 [PASSPORT] Contraseña incorrecta');
           return done(null, false, { message: "Contraseña incorrecta" });
+        }
 
+        console.log('🔑 [PASSPORT] ✅ Autenticación exitosa');
         return done(null, user);
-      } catch (error) {
+      } catch (error: any) {
+        console.error('🔑 [PASSPORT] ❌ Error en autenticación:', error);
+        console.error('🔑 [PASSPORT] Error message:', error?.message);
+        console.error('🔑 [PASSPORT] Error stack:', error?.stack);
         return done(error);
       }
     }

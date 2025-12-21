@@ -71,12 +71,20 @@ export class ErrorMiddleware {
       const { message, name, stack, validationErrors } = error;
       const statusCode =  error.statusCode ;
       logger.error(`${userName}--${message}`, error);
+      console.error('❌ AppError:', message, error);
       res.status( statusCode).json({ name, message, validationErrors });
     } else {
       const rError = AppError.internalServer(
         "Se produjo un error interno del servidor"
       );
       logger.error(`${userName}--${rError.message}`, error);
+      console.error('❌ Error no controlado en middleware:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+      if (error && typeof error === 'object') {
+        console.error('Error object keys:', Object.keys(error));
+      }
       const statusCode =  StatusCodes.INTERNAL_SERVER_ERROR;
       res.status( statusCode).json(rError);
     }

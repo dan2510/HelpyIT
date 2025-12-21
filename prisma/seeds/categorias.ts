@@ -1,65 +1,68 @@
-export const categorias = [
-  // 1
+export const categoriasMenu = [
   {
-    nombre: "Incidente Crítico",
-    descripcion: "Incidentes que detienen la operación completamente",
-    idsla: 1, // SLA Crítico
+    nombre: "Pollo Frito",
+    descripcion: "Delicioso pollo frito con diferentes porciones y acompañamientos",
     activo: true,
+    orden: 1,
   },
-  // 2
   {
-    nombre: "Falla de Sistema",
-    descripcion: "Fallas importantes en sistemas principales",
-    idsla: 2, // SLA Alto
+    nombre: "Alitas",
+    descripcion: "Alitas de pollo con diferentes tamaños y salsas",
     activo: true,
+    orden: 2,
   },
-  // 3
   {
-    nombre: "Problema de Red",
-    descripcion: "Issues relacionados con conectividad y redes",
-    idsla: 2, // SLA Alto
+    nombre: "Nuggets",
+    descripcion: "Nuggets de pollo con diferentes preparaciones",
     activo: true,
+    orden: 3,
   },
-  // 4
   {
-    nombre: "Error de Software",
-    descripcion: "Bugs y errores en aplicaciones",
-    idsla: 3, // SLA Medio
+    nombre: "Combos",
+    descripcion: "Combos familiares e individuales",
     activo: true,
+    orden: 4,
   },
-  // 5
   {
-    nombre: "Solicitud de Acceso",
-    descripcion: "Solicitudes de permisos y accesos",
-    idsla: 3, // SLA Medio
+    nombre: "Para Picar",
+    descripcion: "Aperitivos y acompañamientos",
     activo: true,
+    orden: 5,
   },
-  // 6
   {
-    nombre: "Capacitación",
-    descripcion: "Solicitudes de entrenamiento y capacitación",
-    idsla: 4, // SLA Bajo
+    nombre: "Hamburguesas Artesanales",
+    descripcion: "Hamburguesas de pollo y carne",
     activo: true,
+    orden: 6,
   },
-  // 7
   {
-    nombre: "Consulta General",
-    descripcion: "Preguntas y consultas generales",
-    idsla: 4, // SLA Bajo
+    nombre: "Sándwiches",
+    descripcion: "Sándwiches de carne y pollo",
     activo: true,
+    orden: 7,
   },
-  // 8
   {
-    nombre: "Mantenimiento Preventivo",
-    descripcion: "Tareas de mantenimiento programado",
-    idsla: 4, // SLA Bajo
+    nombre: "Especialidades de la Casa",
+    descripcion: "Platos especiales de la casa",
     activo: true,
+    orden: 8,
   },
-  // 9
   {
-    nombre: "Instalación de Software",
-    descripcion: "Solicitudes de instalación de aplicaciones",
-    idsla: 5, // SLA Express
+    nombre: "Platos Fuertes",
+    descripcion: "Platos principales completos",
     activo: true,
+    orden: 9,
+  },
+  {
+    nombre: "Refrescos",
+    descripcion: "Bebidas gaseosas, calientes y naturales",
+    activo: true,
+    orden: 10,
+  },
+  {
+    nombre: "Adicionales",
+    descripcion: "Extras y complementos",
+    activo: true,
+    orden: 11,
   },
 ];

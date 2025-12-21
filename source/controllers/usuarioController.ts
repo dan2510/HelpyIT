@@ -127,6 +127,16 @@ export class UsuarioController {
 
   // LOGIN DE USUARIO
   login = (req: Request, res: Response, next: NextFunction) => {
+    console.log('🔐 [LOGIN] ========== INICIANDO LOGIN ==========');
+    console.log('🔐 [LOGIN] Método:', req.method);
+    console.log('🔐 [LOGIN] Path:', req.path);
+    console.log('🔐 [LOGIN] Body completo:', JSON.stringify(req.body, null, 2));
+    console.log('🔐 [LOGIN] Correo recibido:', req.body?.correo);
+    console.log('🔐 [LOGIN] Password recibido:', req.body?.password ? '***' : 'no proporcionado');
+    console.log('🔐 [LOGIN] Headers:', JSON.stringify(req.headers, null, 2));
+    
+    const controller = this; // Guardar referencia al contexto
+    console.log('🔐 [LOGIN] Controller inicializado, llamando passport.authenticate...');
     passport.authenticate(
       "local",
       { session: false },
@@ -135,45 +145,75 @@ export class UsuarioController {
         user: Express.User | false | null,
         info: { message?: string }
       ) => {
-        if (err) return next(err);
-        if (!user) {
-          return res
-            .status(401)
-            .json({ success: false, message: info.message || "Error de autenticación" });
-        }
-        
-        const usuario = user as any;
-        const token = generateToken({
-          id: usuario.id,
-          correo: usuario.correo,
-          idrol: usuario.idrol,
-          rol: usuario.rol
-        });
-
-        // Actualizar último inicio de sesión
-        this.prisma.usuario.update({
-          where: { id: usuario.id },
-          data: { ultimoiniciosesion: new Date() }
-        }).catch(console.error);
-
-        // Generar notificación de inicio de sesión (asíncrono, no bloquea la respuesta)
-        NotificacionController.crearNotificacion(
-          this.prisma,
-          {
-            tipo: TipoNotificacion.INICIO_SESION,
-            idusuariodestino: usuario.id,
-            idusuarioorigen: null,
-            idtiquete: null,
-            titulo: 'Inicio de sesión exitoso',
-            contenido: `Has iniciado sesión correctamente en HelpyIT el ${new Date().toLocaleString('es-ES')}.`
+        try {
+          if (err) {
+            console.error('❌ Error en passport authenticate:', err);
+            return next(err);
           }
-        ).catch(console.error);
+          if (!user) {
+            console.log('❌ Usuario no autenticado:', info);
+            return res
+              .status(401)
+              .json({ success: false, message: info.message || "Error de autenticación" });
+          }
+          
+          const usuario = user as any;
+          console.log('✅ Usuario autenticado:', { 
+            id: usuario.id, 
+            correo: usuario.correo, 
+            idrol: usuario.idrol 
+          });
+          
+          let token: string;
+          try {
+            token = generateToken({
+              id: usuario.id,
+              correo: usuario.correo,
+              idrol: usuario.idrol,
+              rol: usuario.rol
+            });
+            console.log('✅ Token generado exitosamente');
+          } catch (tokenError: any) {
+            console.error('❌ Error al generar token:', tokenError);
+            return res.status(500).json({
+              success: false,
+              message: "Error al generar token de autenticación"
+            });
+          }
 
-        return res.json({
-          success: true,
-          message: "Inicio de sesión exitoso",
-          token,
-        });
+          // Actualizar último inicio de sesión
+          controller.prisma.usuario.update({
+            where: { id: usuario.id },
+            data: { ultimoiniciosesion: new Date() }
+          }).catch((error) => {
+            console.error('Error al actualizar último inicio de sesión:', error);
+          });
+
+          // Generar notificación de inicio de sesión (asíncrono, no bloquea la respuesta)
+          NotificacionController.crearNotificacion(
+            controller.prisma,
+            {
+              tipo: TipoNotificacion.INICIO_SESION,
+              idusuariodestino: usuario.id,
+              idusuarioorigen: null,
+              idorden: null,
+              titulo: 'Inicio de sesión exitoso',
+              contenido: `Has iniciado sesión correctamente en La ventanita de GORROLES el ${new Date().toLocaleString('es-ES')}.`
+            }
+          ).catch((error) => {
+            console.error('Error al crear notificación de inicio de sesión:', error);
+          });
+
+          return res.json({
+            success: true,
+            message: "Inicio de sesión exitoso",
+            token,
+          });
+        } catch (error: any) {
+          console.error('❌ Error en callback de login:', error);
+          console.error('Error stack:', error.stack);
+          return next(error);
+        }
       }
     )(req, res, next);
   };
@@ -286,6 +326,98 @@ export class UsuarioController {
       });
     } catch (error) {
       console.error('Error en resetPassword:', error);
+      next(error);
+    }
+  };
+
+  // Buscar usuario por teléfono (para flujo de pedidos)
+  buscarPorTelefono = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const telefono = request.params.telefono;
+
+      if (!telefono) {
+        return next(AppError.badRequest("El teléfono es requerido"));
+      }
+
+      const usuario = await this.prisma.usuario.findFirst({
+        where: {
+          telefono: telefono,
+          activo: true
+        },
+        include: {
+          rol: true
+        }
+      });
+
+      if (!usuario) {
+        return response.status(404).json({
+          success: false,
+          message: "Cliente no encontrado"
+        });
+      }
+
+      response.json({
+        success: true,
+        data: { usuario }
+      });
+    } catch (error) {
+      console.error('Error en buscarPorTelefono:', error);
+      next(error);
+    }
+  };
+
+  // Crear cliente temporal (sin contraseña, solo para pedidos)
+  crearClienteTemporal = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const { telefono, nombrecompleto, direccion, latitud, longitud } = request.body;
+
+      if (!telefono || !nombrecompleto || !direccion) {
+        return next(AppError.badRequest("Teléfono, nombre y dirección son requeridos"));
+      }
+
+      // Verificar si ya existe un usuario con ese teléfono
+      const usuarioExistente = await this.prisma.usuario.findFirst({
+        where: { telefono }
+      });
+
+      if (usuarioExistente) {
+        return next(AppError.badRequest("Ya existe un usuario con ese teléfono"));
+      }
+
+      // Obtener el rol CLIENTE
+      const rolCliente = await this.prisma.rol.findFirst({
+        where: { nombre: RoleNombre.CLIENTE }
+      });
+
+      if (!rolCliente) {
+        return next(AppError.internalServer("No se encontró el rol CLIENTE"));
+      }
+
+      // Crear usuario sin contraseña (cliente temporal)
+      const nuevoUsuario = await this.prisma.usuario.create({
+        data: {
+          telefono,
+          nombrecompleto,
+          direccion,
+          latitud: latitud ? parseFloat(latitud) : null,
+          longitud: longitud ? parseFloat(longitud) : null,
+          idrol: rolCliente.id,
+          activo: true,
+          correo: null,
+          contrasenahash: null
+        },
+        include: {
+          rol: true
+        }
+      });
+
+      response.status(201).json({
+        success: true,
+        data: { usuario: nuevoUsuario },
+        message: "Cliente registrado exitosamente"
+      });
+    } catch (error) {
+      console.error('Error en crearClienteTemporal:', error);
       next(error);
     }
   };

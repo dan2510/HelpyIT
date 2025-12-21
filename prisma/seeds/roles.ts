@@ -9,12 +9,7 @@ export const roles = [
   },
   // 2
   {
-    nombre: RoleNombre.TECNICO,
-    descripcion: "Técnico de soporte para resolución de tickets",
-  },
-  // 3
-  {
     nombre: RoleNombre.CLIENTE,
-    descripcion: "Cliente del sistema que puede crear tickets",
+    descripcion: "Cliente que puede realizar pedidos",
   },
 ];
